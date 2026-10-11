@@ -16,7 +16,7 @@
     tab: store.get('tab', 'code'),            // chat | cowork | code
     view: 'welcome',                          // welcome | session | dashboard | projects | routines | routine | routineEdit | customize
     sid: null, info: null, routineId: null,
-    sessions: [], projects: [], routines: [], settings: {}, auth: { checked: false }, repo: '',
+    sessions: [], projects: [], routines: [], artifacts: [], openAfter: null, settings: {}, auth: { checked: false }, repo: '',
     skills: null, mcp: null, plugins: null, dash: null,
     home: '', user: '', chatDir: '', version: '',
     closedGroups: new Set(store.get('closedGroups', [])),
@@ -62,7 +62,8 @@
       case 'auth': S.auth = m.auth; renderAuth(); break;
       case 'update': S.update = m; renderUpdate(); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
-      case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); break;
+      case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
+      case 'artifacts': S.artifacts = m.items; if (!$('search').hidden) renderSearch(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
@@ -1377,6 +1378,7 @@
     showView('customize'); if (tab) custTab = tab;
     document.querySelectorAll('#custTabs button').forEach((b) => b.classList.toggle('active', b.dataset.t === custTab));
     $('custSkills').hidden = custTab !== 'skills'; $('custMcp').hidden = custTab !== 'mcp'; $('custPlugins').hidden = custTab !== 'plugins';
+    $('toolSkills').hidden = custTab !== 'skills'; $('toolMcp').hidden = custTab !== 'mcp'; $('toolPlugins').hidden = custTab !== 'plugins';
     if (custTab === 'skills') { send({ type: 'skills' }); renderSkills(); }
     if (custTab === 'mcp') { send({ type: 'mcp' }); renderMcp(); }
     if (custTab === 'plugins') { send({ type: 'plugins' }); renderPlugins(); }
@@ -1391,8 +1393,8 @@
     const items = S.skills.filter((s) => !q || (s.name + ' ' + s.description).toLowerCase().includes(q));
     if (!items.length) { box.innerHTML = `<div class="empty-page">${icon('skill')}<div>${S.skills.length ? tr('No match.') : tr('No skills installed yet.')}</div></div>`; return; }
     for (const s of items) {
-      const r = el('div', 'rrow'); r.innerHTML = `<span class="icon">${icon('skill')}</span><span class="t"><b></b><span class="tag"></span><div></div></span><span class="acts"></span>`;
-      r.querySelector('b').textContent = s.name; r.querySelector('.tag').textContent = s.scope === 'user' ? tr('Personal') : tr('Project: {scope}', { scope: s.scope }); r.querySelector('div').textContent = s.description; r.querySelector('div').title = s.dir;
+      const r = el('div', 'card c'); r.style.cursor = 'default'; r.innerHTML = `<span class="icon">${icon('skill')}</span><span class="t"><b></b><div></div><small></small></span><span class="acts"></span>`;
+      r.querySelector('b').textContent = s.name; r.querySelector('small').textContent = s.scope === 'user' ? tr('Personal') : tr('Project: {scope}', { scope: s.scope }); r.querySelector('div').textContent = s.description; r.querySelector('div').title = s.dir;
       const use = el('button', 'btn', tr('Use')); use.onclick = () => { setTab(S.tab === 'chat' ? 'code' : S.tab); showWelcome(); welcomeComposer.setText(`/${s.name} `); };
       const x = el('button', 'ib'); x.innerHTML = icon('trash'); x.title = tr('Delete skill'); x.onclick = () => { if (confirm(tr('Delete skill “{name}”?', { name: s.name }))) send({ type: 'skillDelete', dir: s.dir }); };
       r.querySelector('.acts').append(use, x); box.appendChild(r);
@@ -1414,8 +1416,8 @@
     if (S.mcp === null) { box.innerHTML = '<div class="empty-page">' + tr('Loading…') + '</div>'; return; }
     if (!S.mcp.length) { box.innerHTML = `<div class="empty-page">${icon('plug')}<div>${tr('No connectors configured.')}</div></div>`; return; }
     for (const c of S.mcp) {
-      const r = el('div', 'rrow'); r.innerHTML = `<span class="icon">${icon('plug')}</span><span class="t"><b></b><span class="tag"></span><div></div></span><span class="acts"></span>`;
-      r.querySelector('b').textContent = c.name; r.querySelector('.tag').textContent = c.scope === 'user' ? tr('Personal') : c.scope === 'plugin' ? tr('From plugin') : c.scope;
+      const r = el('div', 'card c'); r.style.cursor = 'default'; r.innerHTML = `<span class="icon">${icon('plug')}</span><span class="t"><b></b><div></div><small></small></span><span class="acts"></span>`;
+      r.querySelector('b').textContent = c.name; r.querySelector('small').textContent = c.scope === 'user' ? tr('Personal') : c.scope === 'plugin' ? tr('From plugin') : c.scope;
       r.querySelector('div').textContent = [c.type && c.type.toUpperCase(), c.target, c.health].filter(Boolean).join(' · ');
       if (c.scope === 'user') { const x = el('button', 'ib'); x.innerHTML = icon('trash'); x.title = tr('Remove'); x.onclick = () => { if (confirm(tr('Remove connector “{name}”?', { name: c.name }))) send({ type: 'mcpRemove', name: c.name }); }; r.querySelector('.acts').append(x); }
       box.appendChild(r);
@@ -1434,7 +1436,7 @@
   function renderPlugins() {
     document.querySelectorAll('#plugTabs button').forEach((b) => b.classList.toggle('active', b.dataset.t === plugTab));
     $('plugInstalled').hidden = plugTab !== 'installed'; $('plugDiscover').hidden = plugTab !== 'discover';
-    $('plugSearch').hidden = plugTab !== 'discover'; $('plugCat').hidden = plugTab !== 'discover';
+    $('plugSearch').parentElement.hidden = plugTab !== 'discover'; $('plugCat').hidden = plugTab !== 'discover';
     const P = S.plugins;
     if (!P) { $('plugInstalled').innerHTML = $('plugDiscover').innerHTML = '<div class="empty-page">' + tr('Loading…') + '</div>'; return; }
     const inst = $('plugInstalled'); inst.innerHTML = '';
@@ -1442,8 +1444,8 @@
     else if (!P.installed.length) inst.innerHTML = `<div class="empty-page">${icon('puzzle')}<div>${tr('No plugins installed. Look in Discover.')}</div></div>`;
     for (const p of P.installed) {
       const meta = P.available.find((a) => a.id === p.id) || {};
-      const r = el('div', 'rrow'); r.innerHTML = `<span class="icon">${icon('puzzle')}</span><span class="t"><b></b><span class="tag"></span><div></div></span><span class="acts"></span>`;
-      r.querySelector('b').textContent = p.id.split('@')[0]; r.querySelector('.tag').textContent = `v${p.version}` + (p.enabled ? '' : ' · ' + tr('disabled'));
+      const r = el('div', 'card c'); r.style.cursor = 'default'; r.innerHTML = `<span class="icon">${icon('puzzle')}</span><span class="t"><b></b><div></div><small></small></span><span class="acts"></span>`;
+      r.querySelector('b').textContent = p.id.split('@')[0]; r.querySelector('small').textContent = `v${p.version}` + (p.enabled ? '' : ' · ' + tr('disabled'));
       r.querySelector('div').textContent = meta.description || p.id;
       const sw = el('label', 'switch'); sw.innerHTML = `<input type="checkbox" ${p.enabled ? 'checked' : ''}><span></span>`; sw.title = tr('Enabled');
       sw.querySelector('input').onchange = (e) => send({ type: 'pluginAction', action: e.target.checked ? 'enable' : 'disable', id: p.id });
@@ -1516,10 +1518,12 @@
   }
 
   // --------------------------------------------------------------- search
-  // ⌘K / Ctrl+K or "/" anywhere. Filters: All, Chat, Cowork, Code, Projects, Routines. ←/→ change the filter, ↑/↓ move, ↵ opens.
-  const FILTERS = ['all', 'chat', 'cowork', 'code', 'projects', 'routines'];
+  // ⌘K / Ctrl+K or "/" anywhere. Filters: All, Chat, Cowork, Code, Projects, Routines, Artifacts. ←/→ change the filter, ↑/↓ move, ↵ opens.
+  // Matching ignores accents and case ("depot" finds "Dépôt"). Artifacts are the files Claude wrote in any session (server index).
+  const FILTERS = ['all', 'chat', 'cowork', 'code', 'projects', 'routines', 'artifacts'];
+  const fold = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   let selIdx = 0, results = [], searchFilter = 'all';
-  function openSearch() { $('search').hidden = false; $('searchInput').value = ''; searchFilter = 'all'; renderSearch(); $('searchInput').focus(); }
+  function openSearch() { $('search').hidden = false; $('searchInput').value = ''; searchFilter = 'all'; renderSearch(); $('searchInput').focus(); send({ type: 'artifacts' }); }
   function closeSearch() { $('search').hidden = true; }
   $('searchBtn').onclick = openSearch; $('searchClose').onclick = closeSearch;
   $('search').onclick = (e) => { if (e.target === $('search')) closeSearch(); };
@@ -1534,15 +1538,16 @@
   };
   function renderSearch() {
     document.querySelectorAll('#searchFilters button').forEach((b) => b.classList.toggle('active', b.dataset.f === searchFilter));
-    const q = $('searchInput').value.trim().toLowerCase(); const f = searchFilter;
-    const hit = (t) => !q || t.toLowerCase().includes(q);
-    const sessions = []; const others = [];
+    const q = fold($('searchInput').value.trim()); const f = searchFilter;
+    const hit = (t) => !q || fold(t).includes(q);
+    const sessions = []; const others = []; const arts = [];
+    if (f === 'all' || f === 'artifacts') for (const a of S.artifacts) if (hit(base(a.path) + ' ' + a.title) && (q || f === 'artifacts')) arts.push({ icon: 'file', label: base(a.path), sub: `${tr(a.action)} · ${a.title} · ${ago(a.when)}`, go: () => { if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } } });
     if (f === 'all' || f === 'projects') for (const p of S.projects) if (hit(p.name + ' ' + p.path) && (q || f === 'projects')) others.push({ icon: 'folder', label: p.name, sub: tr('Project · new session'), go: () => { setTab('code'); showWelcome(p.path); } });
     if (f === 'all' || f === 'routines') for (const r of S.routines) if (hit(r.name) && (q || f === 'routines')) others.push({ icon: 'clock', label: r.name, sub: tr('Routine') + ' · ' + describeSchedule(r.schedule), go: () => showRoutine(r.id) });
     for (const s of S.sessions) if (!s.archived && s.kind !== 'routine' && (f === 'all' || f === s.kind) && hit(s.title + ' ' + s.cwd)) sessions.push({ icon: s.kind, label: s.title, sub: `${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`, go: () => openSession(s) });
     const box = $('searchResults'); box.innerHTML = ''; results = []; selIdx = 0;
     const section = (title, list) => { if (!list.length) return; box.appendChild(el('div', 'sh', title)); for (const r of list) { const b = el('button', 'row'); b.innerHTML = `${icon(r.icon)}<span class="t"><span class="tt"></span><small></small></span>`; b.querySelector('.tt').textContent = r.label; b.querySelector('small').textContent = r.sub; b.onclick = () => { r.go(); closeSearch(); }; box.appendChild(b); results.push(r); } };
-    section(q ? tr('Results') : tr('Recents'), sessions.slice(0, q ? 30 : 10)); section(tr('Projects and routines'), others.slice(0, 15));
+    section(q ? tr('Results') : tr('Recents'), sessions.slice(0, q ? 30 : 10)); section(tr('Projects and routines'), others.slice(0, 15)); section(tr('Artifacts'), arts.slice(0, f === 'artifacts' ? 60 : 15));
     if (!q) section(tr('Actions'), [{ icon: 'plus', label: S.tab === 'chat' ? tr('New chat') : S.tab === 'cowork' ? tr('New task') : tr('New session'), sub: tr('In {space}', { space: S.tab === 'chat' ? tr('Chat') : S.tab === 'cowork' ? tr('Cowork') : tr('Code') }), go: () => showWelcome() }, { icon: 'dash', label: tr('Dashboard'), sub: tr('Spend, approvals, context'), go: showDashboard }]);
     if (!results.length) box.appendChild(el('div', 'empty-list', tr('No match.')));
     paintSel();
@@ -1563,6 +1568,7 @@
   function openSettings(page) { applySettingsToUi(); setPage(page || 'general'); $('settingsDlg').showModal(); }
   function setPage(p) { document.querySelectorAll('.set-nav button[data-p]').forEach((b) => b.classList.toggle('active', b.dataset.p === p)); document.querySelectorAll('.set-page').forEach((x) => (x.hidden = x.dataset.page !== p)); }
   document.querySelectorAll('.set-nav button[data-p]').forEach((b) => (b.onclick = () => setPage(b.dataset.p)));
+  $('setSearch').oninput = () => { const q = $('setSearch').value.trim().toLowerCase(); document.querySelectorAll('.set-nav button').forEach((b) => (b.hidden = !!q && !b.textContent.toLowerCase().includes(q))); const first = q && [...document.querySelectorAll('.set-nav button[data-p]')].find((b) => !b.hidden); if (first) setPage(first.dataset.p); };
   document.querySelectorAll('.set-nav button[data-go]').forEach((b) => (b.onclick = () => { $('settingsDlg').close(); showCustomize(b.dataset.go); }));
   $('settingsClose').onclick = () => $('settingsDlg').close();
   function applySettingsToUi() {

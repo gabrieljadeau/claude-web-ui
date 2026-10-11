@@ -11,6 +11,9 @@
 <svg width="0" height="0" style="position:absolute">
   <symbol id="i-star" viewBox="0 0 32 32"><path fill="currentColor" d="M16 2l2.6 9.4L28 8l-7 7 9 1-9 1 7 7-9.4-3.4L16 30l-2.6-9.4L4 24l7-7-9-1 9-1-7-7 9.4 3.4z"/></symbol>
   <symbol id="i-logo" viewBox="0 0 32 32"><path stroke="#d97757" stroke-width="2.6" stroke-linecap="round" fill="none" d="M21.0 16.0L30.0 16.0 M20.3 18.5L25.5 21.5 M18.5 20.3L23.0 28.1 M16.0 21.0L16.0 27.0 M13.5 20.3L9.0 28.1 M11.7 18.5L6.5 21.5 M11.0 16.0L2.0 16.0 M11.7 13.5L6.5 10.5 M13.5 11.7L9.0 3.9 M16.0 11.0L16.0 5.0 M18.5 11.7L23.0 3.9 M20.3 13.5L25.5 10.5"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
   <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
@@ -287,23 +290,26 @@
   <section id="viewCustomize" class="view page" hidden>
     <div class="page-in">
       <div class="page-head"><h1>Customize</h1></div>
-      <div class="pills" id="custTabs"><button data-t="skills" class="active">Skills</button><button data-t="mcp">Connectors</button><button data-t="plugins">Plugins</button></div>
+      <div class="cust-bar">
+        <div class="pills" id="custTabs"><button data-t="skills" class="active">Skills</button><button data-t="mcp">Connectors</button><button data-t="plugins">Plugins</button></div>
+        <div class="toolbar" id="toolSkills"><span class="spacer"></span><span class="sfield"><svg><use href="#i-search"/></svg><input id="skillSearch" placeholder="Search"></span><button class="btn dark" id="skillAddBtn"><svg><use href="#i-plus"/></svg>Add</button></div>
+        <div class="toolbar" id="toolMcp" hidden><span class="spacer"></span><button class="btn dark" id="mcpAddBtn"><svg><use href="#i-plus"/></svg>Add</button></div>
+        <div class="toolbar" id="toolPlugins" hidden><div class="pills small" id="plugTabs"><button data-t="installed" class="active">Yours</button><button data-t="discover">Discover</button></div><span class="spacer"></span>
+          <span class="sfield"><svg><use href="#i-search"/></svg><input id="plugSearch" placeholder="Search"></span><select id="plugCat"><option value="">All categories</option></select><button class="btn" id="mkAddBtn">Add marketplace</button></div>
+      </div>
 
       <div id="custSkills">
-        <div class="toolbar"><input id="skillSearch" placeholder="Search skills"><span class="spacer"></span><button class="btn dark" id="skillAddBtn">Add skill</button></div>
+        <div class="cards" id="skillList"></div>
         <p class="muted small">Skills are folders with a <code>SKILL.md</code> file that teach Claude a workflow. Installed in <code>~/.claude/skills</code>; the terminal <code>claude</code> uses them too.</p>
-        <div class="rows" id="skillList"></div>
       </div>
 
       <div id="custMcp" hidden>
-        <div class="toolbar"><span class="muted small">Connectors (MCP servers) give Claude tools: web services, databases, your own scripts.</span><span class="spacer"></span><button class="btn dark" id="mcpAddBtn">Add connector</button></div>
-        <div class="rows" id="mcpList"></div>
+        <div class="cards" id="mcpList"></div>
+        <p class="muted small">Connectors (MCP servers) give Claude tools: web services, databases, your own scripts.</p>
       </div>
 
       <div id="custPlugins" hidden>
-        <div class="toolbar"><div class="pills small" id="plugTabs"><button data-t="installed" class="active">Installed</button><button data-t="discover">Discover</button></div>
-          <input id="plugSearch" placeholder="Search plugins"><select id="plugCat"><option value="">All categories</option></select><span class="spacer"></span><button class="btn" id="mkAddBtn">Add marketplace</button></div>
-        <div class="rows" id="plugInstalled"></div>
+        <div class="cards" id="plugInstalled"></div>
         <div class="cards" id="plugDiscover" hidden></div>
       </div>
     </div>
@@ -335,7 +341,7 @@
 <div id="search" class="overlay top" hidden>
   <div class="panel narrow">
     <div class="search-top"><svg class="sicon"><use href="#i-search"/></svg><input id="searchInput" placeholder="Search" autocomplete="off"><button class="ib" id="searchClose" title="Close">✕</button></div>
-    <div class="pills small" id="searchFilters"><button data-f="all" class="active">All</button><button data-f="chat">Chat</button><button data-f="cowork">Cowork</button><button data-f="code">Code</button><button data-f="projects">Projects</button><button data-f="routines">Routines</button></div>
+    <div class="pills small" id="searchFilters"><button data-f="all" class="active">All</button><button data-f="chat">Chat</button><button data-f="cowork">Cowork</button><button data-f="code">Code</button><button data-f="projects">Projects</button><button data-f="routines">Routines</button><button data-f="artifacts">Artifacts</button></div>
     <div id="searchResults"></div>
     <div class="search-foot"><span><kbd>Esc</kbd> Close</span><span><kbd>←</kbd><kbd>→</kbd> Change type</span><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>↵</kbd> Open</span><span class="spacer"></span><span><kbd>⌘N</kbd> New</span><span><kbd>⌘⇧⌫</kbd> Delete chat</span><span><kbd>/</kbd> or <kbd>⌘K</kbd> anywhere</span></div>
   </div>
@@ -344,14 +350,15 @@
 <!-- Settings -->
 <dialog id="settingsDlg" class="settings">
   <nav class="set-nav">
+    <span class="sfield set-search"><svg><use href="#i-search"/></svg><input id="setSearch" placeholder="Search" autocomplete="off"></span>
     <div class="set-sec">Settings</div>
-    <button data-p="general" class="active">General</button>
-    <button data-p="connection">Connection</button>
-    <button data-p="code">Claude Code</button>
-    <button data-p="voice">Voice</button>
-    <button data-p="feedback">Feedback</button>
+    <button data-p="general" class="active"><svg><use href="#i-gear"/></svg>General</button>
+    <button data-p="connection"><svg><use href="#i-plug"/></svg>Connection</button>
+    <button data-p="code"><svg><use href="#i-code"/></svg>Claude Code</button>
+    <button data-p="voice"><svg><use href="#i-mic"/></svg>Voice</button>
+    <button data-p="feedback"><svg><use href="#i-life"/></svg>Feedback</button>
     <div class="set-sec">Customize</div>
-    <button data-go="skills">Skills</button><button data-go="mcp">Connectors</button><button data-go="plugins">Plugins</button>
+    <button data-go="skills"><svg><use href="#i-skill"/></svg>Skills</button><button data-go="mcp"><svg><use href="#i-plug"/></svg>Connectors</button><button data-go="plugins"><svg><use href="#i-puzzle"/></svg>Plugins</button>
   </nav>
   <div class="set-body">
     <button class="ib set-close" id="settingsClose" title="Close">✕</button>
@@ -359,7 +366,7 @@
       <h3>General</h3>
       <div class="set-row"><div><b>Your name</b><small>Used in the greeting.</small></div><input id="setName" maxlength="60" placeholder="Name"></div>
       <h3 style="margin-top:18px">Appearance</h3>
-      <div class="set-row"><div><b>Theme</b></div><div class="pills small" id="themePills"><button data-v="auto">System</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+      <div class="set-row"><div><b>Theme</b></div><div class="pills small icons" id="themePills"><button data-v="auto" title="System"><svg><use href="#i-monitor"/></svg></button><button data-v="light" title="Light"><svg><use href="#i-sun"/></svg></button><button data-v="dark" title="Dark"><svg><use href="#i-moon"/></svg></button></div></div>
       <div class="set-row"><div><b>Interface language</b><small>Applies after the page reloads.</small></div><select id="setUiLang"><option value="auto">System</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="it">Italiano</option><option value="de">Deutsch</option></select></div>
       <div class="set-row"><div><b>Transcript text size</b><small>Size of the conversation text.</small></div><div class="pills small" id="sizePills"><button data-v="s">Small</button><button data-v="m">Medium</button><button data-v="l">Large</button></div></div>
       <div class="set-row"><div><b>Transcript width</b><small>Maximum width of the transcript and composer.</small></div><div class="pills small" id="widthPills"><button data-v="n">Narrow</button><button data-v="m">Medium</button><button data-v="w">Wide</button></div></div>

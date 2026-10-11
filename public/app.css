@@ -110,6 +110,9 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 .page-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .page-head h1 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 0; letter-spacing: -.2px; }
 .toolbar { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; flex-wrap: wrap; } .toolbar input { min-width: 220px; }
+.cust-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; } .cust-bar .toolbar { margin: 0; flex: 1; justify-content: flex-end; } .cust-bar .toolbar input { min-width: 0; }
+.cust-bar .btn.dark svg { width: 13px; height: 13px; margin-right: 5px; vertical-align: -2px; }
+.card.c .acts { display: flex; gap: 4px; align-items: center; flex: none; align-self: flex-start; }
 
 .welcome { margin: auto; width: min(var(--wrap), 92vw); padding: 40px 0 120px; }
 .welcome h1 { font-family: var(--serif); font-weight: 400; font-size: 38px; margin: 0 0 24px; letter-spacing: -.3px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
@@ -244,11 +247,16 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .dlg-path { padding: 8px 16px; font-size: 13px; color: var(--muted); word-break: break-all; }
 #dirs { max-height: 50vh; overflow-y: auto; padding: 4px 8px; } #dirs button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 8px; } #dirs button:hover { background: var(--soft); }
 .dlg-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line2); }
-dialog.settings { width: min(820px, 94vw); height: min(620px, 90vh); display: none; grid-template-columns: 180px 1fr; overflow: hidden; }
+dialog.settings { width: min(880px, 94vw); height: min(660px, 90vh); display: none; grid-template-columns: 196px 1fr; overflow: hidden; }
 dialog.settings[open] { display: grid; }
-.set-nav { background: var(--side); border-right: 1px solid var(--line2); padding: 14px 8px; display: flex; flex-direction: column; gap: 1px; }
+.set-nav { background: var(--panel); padding: 14px 10px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+.sfield { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 9px; padding: 0 8px; background: var(--panel); min-width: 0; }
+.sfield svg { width: 14px; height: 14px; color: var(--muted); flex: none; } .sfield input { border: 0; padding: 6px 0; background: none; min-width: 0; width: 150px; font-size: 13px; }
+.set-search { margin: 0 0 10px; } .set-search input { width: 100%; }
+.pills.icons button { padding: 3px 7px; display: grid; place-items: center; } .pills.icons svg { width: 15px; height: 15px; }
 .set-sec { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); padding: 10px 10px 4px; }
-.set-nav button { border: 0; background: none; text-align: left; border-radius: 7px; padding: 6px 10px; font-size: 13.5px; } .set-nav button:hover, .set-nav button.active { background: var(--hover); }
+.set-nav button { border: 0; background: none; text-align: left; border-radius: 7px; padding: 6px 10px; font-size: 13.5px; display: flex; align-items: center; gap: 9px; } .set-nav button:hover, .set-nav button.active { background: var(--hover); }
+.set-nav button svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
 .set-body { position: relative; overflow-y: auto; padding: 22px 26px; }
 .set-close { position: absolute; top: 12px; right: 12px; font-size: 14px; }
 .set-page h3 { margin: 0 0 10px; font-size: 15px; }
