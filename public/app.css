@@ -266,6 +266,7 @@ dialog { border: 1px solid var(--line); border-radius: 16px; padding: 0; width: 
 dialog::backdrop { background: rgba(0,0,0,.35); }
 .dlg-head { padding: 14px 18px; border-bottom: 1px solid var(--line2); font-weight: 600; }
 .dlg-body { max-height: 70vh; overflow-y: auto; padding: 16px 18px; }
+.news { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; } .news li + li { margin-top: 6px; }
 .dlg-path { padding: 8px 16px; font-size: 13px; color: var(--muted); word-break: break-all; }
 #dirs { max-height: 50vh; overflow-y: auto; padding: 4px 8px; } #dirs button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 8px; } #dirs button:hover { background: var(--soft); }
 .dlg-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line2); }

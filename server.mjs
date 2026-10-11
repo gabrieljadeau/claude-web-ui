@@ -1074,8 +1074,9 @@ function sessionInfo(rt) {
 wss.on('connection', async (ws) => {
   clients.add(ws);
   const send = (obj) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); };
-  send({ type: 'hello', platform: process.platform, home: os.homedir(), user: displayName(), chatDir: CHAT_DIR, version: APP_VERSION, settings: publicSettings(), auth, routines: state.routines, repo: state.settings.repo || REPO, token: TOKEN });
+  send({ type: 'hello', platform: process.platform, home: os.homedir(), user: displayName(), chatDir: CHAT_DIR, version: APP_VERSION, settings: publicSettings(), auth, routines: state.routines, repo: state.settings.repo || REPO, token: TOKEN, news: !!whatsNew });
   send({ type: 'update', ...update });
+  if (whatsNew) send({ type: 'whatsNew', ...whatsNew });
   send({ type: 'sessions', items: await sidebar(), projects: projects() });
   if (!auth.checked) checkAuth();
 
@@ -1456,6 +1457,18 @@ async function checkUpdate() {
   broadcast({ type: 'update', ...update });
   return update;
 }
+// What changed since the last run: the commit the previous run was on is kept in ~/.claude-web-ui/head; new commits are listed in the "What's new" popup.
+let whatsNew = null;
+async function detectWhatsNew() {
+  const headFile = path.join(DATA_DIR, 'head');
+  const head = (await git(['rev-parse', 'HEAD'])).stdout.trim(); if (!head) return;
+  let prev = ''; try { prev = fs.readFileSync(headFile, 'utf8').trim(); } catch { /* first run */ }
+  if (prev && prev !== head) {
+    const log = (await git(['log', '--format=%s', '-n', '40', `${prev}..HEAD`])).stdout.trim().split('\n').filter(Boolean);
+    if (log.length) { whatsNew = { head, version: APP_VERSION, log }; broadcast({ type: 'whatsNew', ...whatsNew }); }
+  }
+  if (prev !== head) fs.writeFileSync(headFile, head);
+}
 async function applyUpdate() {
   if (update.applying) return;
   update.applying = true; update.error = '';
@@ -1539,6 +1552,7 @@ server.listen(PORT, HOST, () => {
   checkAuth();
   listing();
   openBrowser(URL_WITH_TOKEN);
+  detectWhatsNew();
   setTimeout(checkUpdate, 8000); setInterval(checkUpdate, 30 * 60 * 1000).unref();
   setTimeout(() => artifacts().catch(() => {}), 3000);   // warm the artifact index so the first ⌘K / Artifacts page is instant
 });

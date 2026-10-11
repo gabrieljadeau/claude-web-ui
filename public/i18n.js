@@ -552,6 +552,8 @@
     'Installing dependencies…': ['Installation des dépendances…', 'Instalando dependencias…', 'Installazione delle dipendenze…', 'Abhängigkeiten werden installiert…'],
     'Relaunching…': ['Relancement…', 'Reiniciando…', 'Riavvio…', 'Neustart…'],
     'Updating…': ['Mise à jour…', 'Actualizando…', 'Aggiornamento…', 'Aktualisierung…'],
+    "What's new": ['Nouveautés', 'Novedades', 'Novità', 'Neuigkeiten'],
+    "What's new in {v}": ['Nouveautés de la version {v}', 'Novedades de la versión {v}', 'Novità della versione {v}', 'Neu in Version {v}'],
     'Updated to {v}': ['Mis à jour vers {v}', 'Actualizado a {v}', 'Aggiornato alla {v}', 'Aktualisiert auf {v}'],
     // ---- settings
     'General': ['Général', 'General', 'Generale', 'Allgemein'],

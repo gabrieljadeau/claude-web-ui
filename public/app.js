@@ -52,7 +52,7 @@
     switch (m.type) {
       case 'hello':
         Object.assign(S, { home: m.home, user: m.user, chatDir: m.chatDir, version: m.version, settings: m.settings, auth: m.auth, routines: m.routines, repo: m.repo });
-        try { if (sessionStorage.getItem('updating')) { sessionStorage.removeItem('updating'); toast(tr('Updated to {v}', { v: m.version })); } } catch { /* private window */ }
+        try { if (sessionStorage.getItem('updating')) { sessionStorage.removeItem('updating'); if (!m.news) toast(tr('Updated to {v}', { v: m.version })); } } catch { /* private window */ }
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
@@ -61,6 +61,7 @@
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
       case 'update': S.update = m; renderUpdate(); break;
+      case 'whatsNew': showWhatsNew(m); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
       case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
@@ -93,6 +94,16 @@
   function setUser(u) { S.user = u; $('userName').textContent = u; $('avatar').textContent = (u || 'U').charAt(0).toUpperCase(); }
 
   // ---------------------------------------------------------------- auth
+  // Shown once per browser for each new version the server starts on.
+  function showWhatsNew(m) {
+    if (!m.log?.length || store.get('seenHead', '') === m.head) return;
+    store.set('seenHead', m.head);
+    $('newsHead').textContent = tr("What's new in {v}", { v: m.version });
+    const ul = $('newsList'); ul.innerHTML = '';
+    for (const line of m.log) ul.appendChild(el('li', '', line));
+    $('newsDlg').showModal();
+  }
+  $('newsClose').onclick = () => $('newsDlg').close();
   function renderUpdate() {
     const u = S.update || {}, b = $('updateBtn');
     if (u.manual) { if (u.error) toast(tr('Could not check for updates: {e}', { e: u.error }), true); else if (!u.available) toast(tr('You have the latest version')); }
