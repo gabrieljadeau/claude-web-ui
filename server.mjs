@@ -852,7 +852,7 @@ async function sidebar() {
     if (!rt.sdkId && !rt.items.length && rt.status === 'idle') continue; // empty new chat, not sent yet
     const meta = rt.sdkId ? metaOf(rt.sdkId) : {};
     if (rt.sdkId) seen.add(rt.sdkId);
-    const pending = rt.items.filter((i) => i.type === 'perm' && !i.answer).map((i) => ({ id: i.id, tool: i.tool, input: i.input }));
+    const pending = rt.items.filter((i) => i.type === 'perm' && !i.answer).map((i) => ({ id: i.id, tool: i.tool, input: i.input, noAlways: i.noAlways || undefined }));
     push({ sid: rt.localId, sdkId: rt.sdkId, kind: rt.kind, title: rt.title || firstUserText(rt) || 'New chat', cwd: rt.cwd, when: rt.lastActivity,
       status: rt.status, waiting: rt.pending.size, pending, context: rt.context, cost: rt.cost, unread: rt.unread, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId || meta.routineId || null, live: true });
   }
@@ -866,19 +866,27 @@ async function sidebar() {
   out.sort((a, b) => b.when - a.when);
   return out;
 }
-// Artifacts: every file Claude wrote (Write / Edit / NotebookEdit) in any session, for the ⌘K palette. One pass per
-// transcript, cached by its last-modified time; live sessions are read from their items. Missing files are dropped.
+// Artifacts: every file Claude wrote (Write / Edit / NotebookEdit) in any session, plus the pages it published on
+// claude.ai with the Artifact tool, for the Artifacts page and the ⌘K palette (the page decides what it shows by
+// default). One pass per transcript, cached by its last-modified time; live sessions are read from their items.
+// Missing files are dropped, published links are kept.
 const artifactCache = new Map();   // sdkId -> { when, files: [{ path, action }] }
 const artifactPaths = new Set();   // every path the last index pass listed: "Show in folder" may reveal these too
 const ARTIFACT_TOOLS = { Write: 'Created', Edit: 'Edited', MultiEdit: 'Edited', NotebookEdit: 'Edited' };
-function artifactsOfTools(tools) {
-  const files = new Map();
+const ARTIFACT_URL = /https:\/\/claude\.ai\/(?:code\/)?artifact\/[A-Za-z0-9_-]+/;
+function artifactsOfTools(tools, cwd) {   // tools: [{ name, input, result }]
+  const files = new Map(); const links = new Map();
   for (const t of tools) {
-    const act = ARTIFACT_TOOLS[t.name]; const p = t.input?.file_path || t.input?.notebook_path;
-    if (!act || typeof p !== 'string' || !path.isAbsolute(p)) continue;
-    files.set(p, files.get(p) === 'Created' ? 'Created' : act);
+    const act = ARTIFACT_TOOLS[t.name]; let p = t.input?.file_path || t.input?.notebook_path;
+    if (typeof p === 'string' && !path.isAbsolute(p) && cwd) p = path.resolve(cwd, p);
+    if (act && typeof p === 'string' && path.isAbsolute(p)) files.set(p, files.get(p) === 'Created' ? 'Created' : act);
+    // A publish with the Artifact tool: the claude.ai link is in its result; the title (or the file name) names it.
+    if (t.name === 'Artifact' && (!t.input?.action || t.input.action === 'publish') && !t.input?.asset) {
+      const url = ARTIFACT_URL.exec(String(t.result || ''))?.[0];
+      if (url) links.set(url, { url, path: typeof p === 'string' ? p : '', name: t.input?.title || (p ? path.basename(p) : url.split('/').pop()) });
+    }
   }
-  return [...files].map(([path, action]) => ({ path, action }));
+  return [...[...files].map(([path, action]) => ({ path, action })), ...[...links.values()].map((l) => ({ ...l, action: 'Published' }))];
 }
 async function artifacts() {
   const out = [];
@@ -886,19 +894,30 @@ async function artifacts() {
     if (s.archived) continue;
     let files;
     const rt = runtimes.get(s.sid);
-    if (rt) files = artifactsOfTools(rt.items.filter((i) => i.type === 'tool'));
+    if (rt) files = artifactsOfTools(rt.items.filter((i) => i.type === 'tool'), rt.cwd);
     else {
       const c = artifactCache.get(s.sid);
       if (c && c.when === s.when) files = c.files;
       else {
         const msgs = await getSessionMessages(s.sid, s.cwd ? { dir: s.cwd } : undefined).catch(() => []);
-        const tools = [];
-        for (const m of msgs) { const c = m.message?.content; if (Array.isArray(c)) for (const b of c) if (b.type === 'tool_use') tools.push(b); }
-        files = artifactsOfTools(tools);
+        const tools = []; const uses = new Map();   // tool_use id -> entry, so each result lands on its call
+        for (const m of msgs) {
+          const c = m.message?.content; if (!Array.isArray(c)) continue;
+          for (const b of c) {
+            if (b.type === 'tool_use') { const t = { name: b.name, input: b.input, result: '' }; uses.set(b.id, t); tools.push(t); }
+            else if (b.type === 'tool_result' && uses.has(b.tool_use_id)) uses.get(b.tool_use_id).result = resultText(b.content);
+          }
+        }
+        files = artifactsOfTools(tools, s.cwd);
         artifactCache.set(s.sid, { when: s.when, files });
       }
     }
-    for (const f of files) if (fs.existsSync(f.path)) { artifactPaths.add(f.path); out.push({ ...f, sid: s.sid, cwd: s.cwd, kind: s.kind, title: s.title, when: s.when }); }
+    for (const f of files) {
+      const here = !!f.path && fs.existsSync(f.path);
+      if (!here && !f.url) continue;
+      if (here) artifactPaths.add(f.path); else f.path = '';
+      out.push({ ...f, sid: s.sid, cwd: s.cwd, kind: s.kind, title: s.title, when: s.when });
+    }
   }
   return out;
 }

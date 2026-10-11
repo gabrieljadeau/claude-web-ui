@@ -116,6 +116,21 @@
         <button class="mbtn" id="modelChip"><span id="modelChipText">Default model</span><small id="effortChipText"></small></button>
       </div>
       <div class="suggest" id="suggest"></div>
+      <!-- Home: sessions waiting for a permission, answerable from here -->
+      <section class="needs" id="needsYou" hidden>
+        <div class="zone-head"><span class="st waiting"></span><b>Needs you</b><span class="muted small" id="needsCount"></span></div>
+        <div id="needsList"></div>
+      </section>
+      <!-- Home: the Dashboard page, as compact cards -->
+      <section class="home-dash" id="homeDash">
+        <div class="zone-head"><b>Dashboard</b><span class="spacer"></span><button class="btn link small" id="homeDashMore">Open the Dashboard</button></div>
+        <div class="home-cards">
+          <div class="card"><div class="card-t">Working now</div><div class="hc" id="homeRunning"></div></div>
+          <div class="card go" id="homeSpendCard" title="Open the Dashboard"><div class="card-t" id="homeSpendT">Spent today</div><div class="hc" id="homeSpend"></div></div>
+          <div class="card"><div class="card-t">Next scheduled</div><div class="hc" id="homeRoutines"></div></div>
+          <div class="card"><div class="card-t">Recent artifacts</div><div class="hc" id="homeArtifacts"></div></div>
+        </div>
+      </section>
       <div class="howto" id="howto">
         <div class="howto-grid">
           <div><b>Chat</b><span>A conversation without a folder. Claude reads what you attach and looks things up online. With "Terminal in Chat" on, it can also run commands on this Mac.</span></div>
@@ -264,7 +279,7 @@
   <!-- Artifacts: every file Claude wrote, across sessions -->
   <section id="viewArtifacts" class="view page" hidden>
     <div class="page-in">
-      <div class="page-head"><h1>Artifacts</h1><span class="spacer"></span><span class="sfield"><svg><use href="#i-search"/></svg><input id="artifactFilter" placeholder="Filter artifacts" autocomplete="off"></span>
+      <div class="page-head"><h1>Artifacts</h1><span class="spacer"></span><label class="chk" title="Every file Claude wrote or edited in any session, not only the pages it built"><input type="checkbox" id="artAll">Show all</label><span class="sfield"><svg><use href="#i-search"/></svg><input id="artifactFilter" placeholder="Filter artifacts" autocomplete="off"></span>
         <div class="view-seg" id="artView" title="List · Grid"><button data-v="list" title="List"><svg class="chk"><use href="#i-check"/></svg><svg><use href="#i-list"/></svg></button><button data-v="grid" title="Grid"><svg class="chk"><use href="#i-check"/></svg><svg><use href="#i-grid"/></svg></button></div></div>
       <p class="muted">Files Claude created or changed in your sessions. View one in a new tab, open the chat that made it, or show it in the folder.</p>
       <div class="plist" id="artifactList"></div>

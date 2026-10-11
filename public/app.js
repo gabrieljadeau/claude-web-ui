@@ -57,8 +57,8 @@
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
-      case 'sessions': S.sessions = m.items; S.projects = m.projects; $('projectCount').textContent = S.projects.length; $('projectCount').hidden = !S.projects.length; renderList(); refreshArtifacts(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
-      case 'routines': S.routines = m.items; renderList(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); break;
+      case 'sessions': S.sessions = m.items; S.projects = m.projects; $('projectCount').textContent = S.projects.length; $('projectCount').hidden = !S.projects.length; renderList(); refreshArtifacts(); renderNeeds(); if (S.view === 'welcome') { renderWelcomeChips(); renderHomeDash(); refreshHomeDash(); } if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
+      case 'routines': S.routines = m.items; renderList(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'welcome') renderHomeDash(); break;
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
       case 'update': S.update = m; renderUpdate(); break;
@@ -66,7 +66,7 @@
       case 'whatsNew': showWhatsNew(m); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
-      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; renderList(); if (S.view === 'projects') renderProjects(); if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
+      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; updateArtifactCount(); renderList(); if (S.view === 'projects') renderProjects(); if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); if (S.view === 'welcome') renderHomeDash(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'connectors': if (connMenuWanted) { connMenuWanted = false; connectorMenu(m.items || [], m.defaults || []); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
@@ -78,7 +78,7 @@
       case 'skills': S.skills = m.items; renderSkills(); break;
       case 'mcp': S.mcp = m.items; renderMcp(); break;
       case 'plugins': S.plugins = m; renderPlugins(); break;
-      case 'dashboard': S.dash = m; if (S.view === 'dashboard') renderDashboard(); break;
+      case 'dashboard': S.dash = m; if (S.view === 'dashboard') renderDashboard(); if (S.view === 'welcome') renderHomeDash(); break;
       case 'reported': onReported(m); break;
       case 'browserFrame': browserFrame(m); break;
       case 'browserState': browserState(m); break;
@@ -248,7 +248,7 @@
     const h = el('div', 'grp-head'); h.innerHTML = `<span class="arrow">▼</span><span class="name"></span>`;
     h.querySelector('.name').textContent = name; h.title = folder || name;
     if (folder) {
-      const sids = new Set(items.map((s) => s.sid)); const nArt = S.artifacts.reduce((n, a) => n + (sids.has(a.sid) ? 1 : 0), 0);
+      const sids = new Set(items.map((s) => s.sid)); const nArt = visibleArts().reduce((n, a) => n + (sids.has(a.sid) ? 1 : 0), 0);
       if (nArt) { const g = el('span', 'badge art', nArt); g.title = nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt }); h.appendChild(g); }
       const plus = el('button', 'ib sm'); plus.title = tr('New session in this folder'); plus.innerHTML = icon('plus');
       plus.onclick = (e) => { e.stopPropagation(); showWelcome(folder); };
@@ -281,7 +281,7 @@
       b.title = why ? `${s.title}\n${why}` : s.title;
       return b;
     }
-    const nArt = S.artifacts.reduce((n, a) => n + (a.sid === s.sid ? 1 : 0), 0);
+    const nArt = visibleArts().reduce((n, a) => n + (a.sid === s.sid ? 1 : 0), 0);
     if (nArt) { const g = el('span', 'badge art', nArt); g.title = nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt }); b.querySelector('.more').before(g); }
     b.title = `${s.title}\n${s.status === 'waiting' ? tr('Needs your approval') + ' · ' : s.status === 'running' ? tr('Working…') + ' · ' : ''}${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`;
     b.querySelector('.st').className = 'st ' + (s.status === 'waiting' ? 'waiting' : s.status === 'running' ? 'running' : s.unread ? 'unread' : s.kind === 'chat' ? '' : 'hollow');
@@ -378,6 +378,7 @@
     $('welcomeTitle').textContent = code ? (first ? tr('What\'s up next, {name}?', { name: first }) : tr('What\'s up next?')) : (first ? tr('Welcome, {name}', { name: first }) : tr('Welcome'));
     welcomeComposer.setPlaceholder(code ? tr('Describe a task or ask a question') : tr('How can I help you today?'));
     renderWelcomeChips(); renderSuggest();
+    renderNeeds(); renderHomeDash(); refreshHomeDash(true); refreshArtifacts();
     welcomeComposer.focus();
   }
   function renderWelcomeChips() {
@@ -1405,8 +1406,77 @@
     for (const r of D.routines) { const row = el('div', 'kv'); row.innerHTML = '<span></span><span class="m"></span>'; row.querySelector('span').textContent = r.name; const last = r.runs?.[0]; row.querySelector('.m').textContent = (r.enabled ? (r.nextRun ? tr('next {when}', { when: fmtWhen(r.nextRun) }) : tr('on')) : tr('paused')) + (last ? ' · ' + tr('last {status} {ago}', { status: last.ok === false ? tr('failed') : last.ok ? tr('ok') : tr('running'), ago: ago(last.at) }) : ''); row.style.cursor = 'pointer'; row.onclick = () => showRoutine(r.id); rb.appendChild(row); }
   }
 
+  // ------------------------------------------------------------- home
+  // "Needs you": every session waiting for a permission, in any space, answered from Home with the same 'permit'
+  // message as the card in the chat. The count pill sits in the header of every other view and opens Home.
+  const waitingSessions = () => S.sessions.filter((s) => s.status === 'waiting' && (s.pending || []).length);
+  function mountWaitPills() {
+    for (const head of document.querySelectorAll('.s-head, .page-head')) {
+      const b = el('button', 'wait-pill'); b.hidden = true; b.innerHTML = '<i></i><span></span>'; b.title = tr('Waiting for your approval. Open Home to answer.');
+      b.onclick = () => showWelcome();
+      const sp = head.querySelector('.spacer'); sp ? head.insertBefore(b, sp) : head.appendChild(b);
+    }
+  }
+  function renderNeeds() {
+    const items = waitingSessions(); const n = items.reduce((k, s) => k + s.pending.length, 0);
+    for (const b of document.querySelectorAll('.wait-pill')) { b.hidden = !n; b.querySelector('span').textContent = n === 1 ? tr('1 waiting') : tr('{n} waiting', { n }); }
+    const box = $('needsYou'); box.hidden = !n;
+    $('needsCount').textContent = n ? (n === 1 ? tr('1 permission to answer') : tr('{n} permissions to answer', { n })) : '';
+    const list = $('needsList'); list.innerHTML = '';
+    for (const s of items) for (const p of s.pending) {
+      const d = describe(p.tool, p.input); const row = el('div', 'need');
+      const who = el('div', 'who'); who.innerHTML = '<b></b> · <span></span>';
+      who.querySelector('b').textContent = s.title; who.querySelector('span').textContent = KIND_LABEL[s.kind] + (s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd));
+      const q = el('div', 'q', askText(p.tool, p.input, d));
+      const arg = el('div', 'arg', formatInput(p.tool, p.input).split('\n')[0]);
+      const btns = el('div', 'btns');
+      const answer = (allow, always) => {
+        send({ type: 'permit', sid: s.sid, id: p.id, tool: p.tool, allow, always });
+        s.pending = s.pending.filter((x) => x.id !== p.id); if (!s.pending.length) s.status = 'running';   // until the next sessions broadcast
+        renderNeeds(); renderHomeDash();
+      };
+      const mk = (label, cls, allow, always) => { const b = el('button', 'btn ' + cls, label); b.onclick = () => answer(allow, always); return b; };
+      const open = el('button', 'btn link', tr('Open')); open.onclick = () => openSession(s);
+      btns.append(mk(tr('Allow'), 'dark', true, false), ...(p.noAlways ? [] : [mk(tr('Always allow'), '', true, true)]), mk(tr('Refuse'), '', false, false), open);
+      row.append(who, q, arg, btns); list.appendChild(row);
+    }
+  }
+  // The Dashboard page as four compact cards. Usage comes from the same 'dashboard' message, refreshed at most every 15 s.
+  let homeDashAt = 0;
+  function refreshHomeDash(force) { if (!force && Date.now() - homeDashAt < 15000) return; homeDashAt = Date.now(); send({ type: 'dashboard' }); }
+  function renderHomeDash() {
+    if (S.view !== 'welcome') return;
+    const run = $('homeRunning'); run.innerHTML = '';
+    const running = S.sessions.filter((s) => s.status === 'running' || s.status === 'waiting').slice(0, 4);
+    if (!running.length) run.appendChild(el('div', 'empty-note', tr('No chat is working right now.')));
+    for (const s of running) { const b = el('button', 'row'); b.innerHTML = '<span class="st"></span><span class="t"><span class="tt"></span><small></small></span>'; b.querySelector('.st').classList.add(s.status); b.querySelector('.tt').textContent = s.title; b.querySelector('small').textContent = KIND_LABEL[s.kind] + (s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)); b.onclick = () => openSession(s); run.appendChild(b); }
+    const D = S.dash; const sub = S.auth?.billing === 'subscription';
+    $('homeSpendT').textContent = tr(sub ? 'Tokens today' : 'Spent today');
+    const sp = $('homeSpend'); sp.innerHTML = '';
+    if (!D) sp.appendChild(el('div', 'empty-note', tr('Loading…')));
+    else {
+      const d0 = new Date(); d0.setHours(0, 0, 0, 0); const day = 86400000;
+      const val = (arr) => arr.reduce((a, u) => a + (sub ? (u.in || 0) + (u.out || 0) : (u.cost || 0)), 0);
+      const amount = (v) => (sub ? fmtK(v) : '$' + v.toFixed(2));
+      const today = D.usage.filter((u) => u.at >= d0.getTime()), week = D.usage.filter((u) => u.at >= Date.now() - 7 * day);
+      sp.appendChild(el('div', 'big', amount(val(today))));
+      sp.appendChild(el('div', 'sub', tr('{n} turns · {x} in 7 days', { n: today.length, x: amount(val(week)) })));
+    }
+    const rb = $('homeRoutines'); rb.innerHTML = '';
+    const routines = (S.routines || []).filter((r) => r.enabled && r.nextRun).sort((a, b) => a.nextRun - b.nextRun).slice(0, 4);
+    if (!routines.length) rb.appendChild(el('div', 'empty-note', tr('Nothing scheduled.')));
+    for (const r of routines) { const row = el('div', 'kv'); row.innerHTML = '<span></span><span class="m"></span>'; row.querySelector('span').textContent = r.name; row.querySelector('.m').textContent = fmtWhen(r.nextRun); row.onclick = () => showRoutine(r.id); rb.appendChild(row); }
+    const ab = $('homeArtifacts'); ab.innerHTML = '';
+    const arts = [...S.artifacts].sort((a, b) => b.when - a.when).slice(0, 4);
+    if (!arts.length) ab.appendChild(el('div', 'empty-note', S.artifactsLoaded ? tr('No artifacts yet.') : tr('Loading…')));
+    for (const a of arts) { const row = el('div', 'kv'); row.innerHTML = '<span></span><span class="m"></span>'; row.querySelector('span').textContent = base(a.path); row.querySelector('.m').textContent = ago(a.when); row.title = a.path; row.onclick = () => openArtifact(a); ab.appendChild(row); }
+  }
+  mountWaitPills();
+  $('homeDashMore').onclick = $('homeSpendCard').onclick = () => showDashboard();
+
   // ------------------------------------------------------------- projects
-  function showProjects() { showView('projects'); renderProjects(); }
+  function showProjects()
+ { showView('projects'); renderProjects(); }
   function renderProjects() {
     const box = $('projectList'); box.innerHTML = '';
     if (!S.projects.length) { box.innerHTML = '<div class="empty-page">' + tr('No projects yet. Add a folder to start.') + '</div>'; return; }
@@ -1415,7 +1485,7 @@
       const mine = S.sessions.filter((s) => s.cwd === p.path && !s.archived); const n = mine.length; const last = mine.reduce((m, s) => Math.max(m, s.when), 0);
       const r = el('div', 'card p'); r.innerHTML = `<b class="nm"></b><div class="path"></div><div class="foot"><span class="when"></span><span class="acts"></span></div>`;
       r.querySelector('.nm').textContent = p.name; r.querySelector('.path').textContent = shortPath(p.path); r.title = p.path;
-      const sids = new Set(mine.map((s) => s.sid)); const nArt = S.artifacts.reduce((k, a) => k + (sids.has(a.sid) ? 1 : 0), 0);
+      const sids = new Set(mine.map((s) => s.sid)); const nArt = visibleArts().reduce((k, a) => k + (sids.has(a.sid) ? 1 : 0), 0);
       r.querySelector('.when').textContent = (n === 1 ? tr('1 session') : tr('{n} sessions', { n })) + (nArt ? ' · ' + (nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt })) : '') + (last ? ' · ' + ago(last) : '');
       const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
       const a = el('button', 'btn', tr('New session')); a.onclick = stop(() => { setTab(S.tab === 'cowork' ? 'cowork' : 'code'); showWelcome(p.path); });
@@ -1427,11 +1497,21 @@
   $('addProjectBtn').onclick = () => pickFolder(S.newFolder || S.home, (p) => send({ type: 'addProject', path: p }));
 
   // -------------------------------------------------------------- artifacts page
-  // Same server index as the ⌘K palette (every file Claude wrote, newest session first); the filter ignores accents.
+  // Same server index as the ⌘K palette (every file Claude wrote or edited, newest session first); the filter ignores accents.
+  // An artifact in the claude.ai sense: a page Claude published on claude.ai, or an HTML / SVG page it created in a
+  // Chat / Cowork / routine session. Edits, other file types and the files of Code sessions are project files, not
+  // artifacts; "Show all" (remembered per browser) lists the whole index anyway.
+  let artAll = store.get('artAll', false);
+  const ART_PAGE = /\.(html?|svg)$/i;
+  function visibleArts() { return artAll ? S.artifacts : S.artifacts.filter((a) => a.url || (a.action === 'Created' && a.kind !== 'code' && ART_PAGE.test(a.path))); }
+  const artName = (a) => a.name || base(a.path);
+  function updateArtifactCount() { const n = visibleArts().length; $('artifactCount').textContent = n; $('artifactCount').hidden = !n; }
+  $('artAll').checked = artAll;
+  $('artAll').onchange = () => { artAll = $('artAll').checked; store.set('artAll', artAll); updateArtifactCount(); renderList(); renderArtifacts(); };
   let artifactsAt = 0;
   function refreshArtifacts() { if (Date.now() - artifactsAt < 10000) return; artifactsAt = Date.now(); send({ type: 'artifacts' }); }
   function showArtifacts() { showView('artifacts'); send({ type: 'artifacts' }); renderArtifacts(); $('artifactFilter').focus({ preventScroll: true }); }
-  function openArtifact(a) { if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } }
+  function openArtifact(a) { if (!a.path) { if (!(S.view === 'session' && S.info?.sid === a.sid)) openSession(a); return; } if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } }
   $('artifactFilter').oninput = renderArtifacts;
   // List or grid, like Google Drive's switcher; the grid shows a preview "screenshot" of each file.
   let artView = store.get('artView', 'list');
@@ -1439,6 +1519,7 @@
   const TEXT_EXT = ['md', 'markdown', 'txt', 'csv', 'json', 'js', 'mjs', 'ts', 'tsx', 'jsx', 'py', 'rb', 'sh', 'css', 'scss', 'yml', 'yaml', 'toml', 'xml', 'sql', 'html', 'htm', 'svg', 'log', 'env', 'ini'];
   function artPreview(a) {
     const box = el('div', 'apv'); const ext = (base(a.path).split('.').pop() || '').toLowerCase();
+    if (!a.path) { box.innerHTML = icon('expand'); box.classList.add('ico'); box.appendChild(el('span', null, 'claude.ai')); return box; }
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { const im = el('img'); im.src = fileUrl(a.path); im.alt = ''; im.loading = 'lazy'; box.appendChild(im); box.classList.add('img'); }
     else if (['html', 'htm', 'svg'].includes(ext)) {
       // a live, scaled-down render of the page as the thumbnail
@@ -1454,7 +1535,7 @@
   const RENDERABLE = /\.(html?|svg|png|jpe?g|gif|webp|pdf|mp4|webm|json|css|txt|md|csv)$/i;
   function viewLink(a, cls, label) {
     const v = el('a', cls, label); if (!label) v.innerHTML = icon('expand');
-    v.href = fileUrl(a.path, !RENDERABLE.test(a.path)); v.target = '_blank'; v.rel = 'noopener'; v.title = tr('Open in new tab');
+    v.href = a.url || fileUrl(a.path, !RENDERABLE.test(a.path)); v.target = '_blank'; v.rel = 'noopener'; v.title = a.url ? tr('Open on claude.ai') : tr('Open in new tab');
     v.onclick = (e) => e.stopPropagation();
     return v;
   }
@@ -1462,8 +1543,8 @@
     document.querySelectorAll('#artView button').forEach((b) => b.classList.toggle('active', b.dataset.v === artView));
     const box = $('artifactList'); box.innerHTML = ''; box.classList.toggle('grid', artView === 'grid');
     const q = fold($('artifactFilter').value.trim());
-    const list = S.artifacts.filter((a) => !q || fold(base(a.path) + ' ' + a.title + ' ' + a.path).includes(q)).slice(0, 300);
-    if (!list.length) { box.innerHTML = `<div class="empty-page">${icon('file')}<div>${S.artifacts.length ? tr('No match.') : S.artifactsLoaded ? tr('No artifacts yet.') : tr('Loading…')}</div></div>`; return; }
+    const list = visibleArts().filter((a) => !q || fold(artName(a) + ' ' + a.title + ' ' + a.path).includes(q)).slice(0, 300);
+    if (!list.length) { box.innerHTML = `<div class="empty-page">${icon('file')}<div>${visibleArts().length ? tr('No match.') : S.artifactsLoaded ? (artAll || !S.artifacts.length ? tr('No artifacts yet.') : tr('No artifacts yet. "Show all" lists every file Claude wrote.')) : tr('Loading…')}</div></div>`; return; }
     // One group per session (newest first), headed by the session's title: click it to open the conversation.
     const groups = new Map();
     for (const a of list) { if (!groups.has(a.sid)) groups.set(a.sid, { s: a, files: [] }); groups.get(a.sid).files.push(a); }
@@ -1474,11 +1555,11 @@
       if (artView === 'grid') {
         const g = el('div', 'agrid');
         for (const a of files) {
-          const c = el('div', 'acard'); c.title = a.path;
+          const c = el('div', 'acard'); c.title = a.url || a.path;
           c.appendChild(artPreview(a));
           const t = el('div', 'at'); t.innerHTML = `${icon('file')}<span class="nm"></span><span class="acts"></span>`;
-          t.querySelector('.nm').textContent = base(a.path);
-          const f = el('button', 'ib sm'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = (e) => { e.stopPropagation(); send({ type: 'reveal', path: a.path }); };
+          t.querySelector('.nm').textContent = artName(a);
+          const f = el('button', 'ib sm'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = (e) => { e.stopPropagation(); send({ type: 'reveal', path: a.path }); }; f.hidden = !a.path;
           t.querySelector('.acts').append(viewLink(a, 'ib sm'), f);
           const m = el('div', 'am', `${tr(a.action)} · ${ago(s.when)}`);
           c.append(t, m); c.onclick = () => openArtifact(a); g.appendChild(c);
@@ -1487,11 +1568,11 @@
       }
       for (const a of files) {
         const r = el('div', 'prow click'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
-        r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${shortPath(a.path)}`;
+        r.querySelector('b').textContent = artName(a); r.querySelector('small').textContent = `${tr(a.action)} · ${a.url || shortPath(a.path)}`;
         r.onclick = (e) => { if (!e.target.closest('button, a')) openArtifact(a); };
         const v = viewLink(a, 'btn', tr('View'));
         const o = el('button', 'btn', tr('Open chat')); o.title = tr('Open the conversation that made it'); o.onclick = () => openArtifact(a);
-        const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path });
+        const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path }); f.hidden = !a.path;
         r.append(v, o, f); box.appendChild(r);
       }
     }
@@ -1756,7 +1837,7 @@
     const q = fold($('searchInput').value.trim()); const f = searchFilter;
     const hit = (t) => !q || fold(t).includes(q);
     const sessions = []; const others = []; const arts = [];
-    if (f === 'all' || f === 'artifacts') for (const a of S.artifacts) if (hit(base(a.path) + ' ' + a.title) && (q || f === 'artifacts')) arts.push({ icon: 'file', label: base(a.path), sub: `${tr(a.action)} · ${a.title} · ${ago(a.when)}`, reveal: a.path, go: () => openArtifact(a) });
+    if (f === 'all' || f === 'artifacts') for (const a of visibleArts()) if (hit(artName(a) + ' ' + a.title) && (q || f === 'artifacts')) arts.push({ icon: a.url ? 'expand' : 'file', label: artName(a), sub: `${tr(a.action)} · ${a.title} · ${ago(a.when)}`, reveal: a.path || undefined, go: () => openArtifact(a) });
     if (f === 'all' || f === 'projects') for (const p of S.projects) if (hit(p.name + ' ' + p.path) && (q || f === 'projects')) others.push({ icon: 'folder', label: p.name, sub: tr('Project · new session'), go: () => { setTab('code'); showWelcome(p.path); } });
     if (f === 'all' || f === 'routines') for (const r of S.routines) if (hit(r.name) && (q || f === 'routines')) others.push({ icon: 'clock', label: r.name, sub: tr('Routine') + ' · ' + describeSchedule(r.schedule), go: () => showRoutine(r.id) });
     for (const s of S.sessions) if (!s.archived && s.kind !== 'routine' && (f === 'all' || f === s.kind) && hit(s.title + ' ' + s.cwd)) sessions.push({ icon: s.kind, label: s.title, sub: `${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`, go: () => openSession(s) });
