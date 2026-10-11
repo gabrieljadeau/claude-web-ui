@@ -61,6 +61,7 @@
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
       case 'update': S.update = m; renderUpdate(); break;
+      case 'context': if (S.info && m.sid === S.info.sid) { S.info.context = m.context; renderCtx($('sCtx'), m.context); } break;
       case 'whatsNew': showWhatsNew(m); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
@@ -392,8 +393,10 @@
     const pct = Math.min(100, Math.round(ctx.used / ctx.window * 100));
     node.hidden = false; node.className = 'ctx' + (pct > 85 ? ' bad' : pct > 60 ? ' warn' : '');
     node.querySelector('i').style.width = pct + '%'; node.querySelector('.pct').textContent = tr('Context {pct}%', { pct });
-    node.title = tr('Context window: {used} of {window} tokens used', { used: fmtK(ctx.used), window: fmtK(ctx.window) });
+    node.title = tr('Context window: {used} of {window} tokens used', { used: fmtK(ctx.used), window: fmtK(ctx.window) }) + (node.id === 'sCtx' ? '\n' + tr('Click to compact the conversation') : '');
   }
+  $('sCtx').style.cursor = 'pointer';
+  $('sCtx').onclick = () => { if (S.info?.status !== 'idle') return; if (confirm(tr('Compact the conversation now? Older messages are summarized to free up context.'))) send({ type: 'compact', sid: S.sid }); };
   function syncUsage() { /* context and cost live in the header */ }
   // The title is a dropdown like claude.ai: rename, pin, archive, delete.
   $('sTitleBtn').onclick = (e) => { const i = S.info; if (i) sessionMenu(e, { sid: i.sid, sdkId: i.sdkId, title: i.title, pinned: i.pinned, archived: i.archived }); };
@@ -1303,12 +1306,20 @@
     const q = fold($('artifactFilter').value.trim());
     const list = S.artifacts.filter((a) => !q || fold(base(a.path) + ' ' + a.title + ' ' + a.path).includes(q)).slice(0, 300);
     if (!list.length) { box.innerHTML = `<div class="empty-page">${icon('file')}<div>${S.artifacts.length ? tr('No match.') : S.artifactsLoaded ? tr('No artifacts yet.') : tr('Loading…')}</div></div>`; return; }
-    for (const a of list) {
-      const r = el('div', 'prow'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
-      r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${a.title} · ${ago(a.when)} · ${shortPath(a.path)}`;
-      const o = el('button', 'btn', tr('Open')); o.onclick = () => openArtifact(a);
-      const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path });
-      r.append(o, f); box.appendChild(r);
+    // One group per session (newest first), headed by the session's title: click it to open the conversation.
+    const groups = new Map();
+    for (const a of list) { if (!groups.has(a.sid)) groups.set(a.sid, { s: a, files: [] }); groups.get(a.sid).files.push(a); }
+    for (const { s, files } of groups.values()) {
+      const h = el('button', 'grp'); h.innerHTML = `${icon(s.kind === 'cowork' ? 'cowork' : s.kind === 'code' ? 'code' : 'chat')}<span class="tt"></span><small></small>`;
+      h.querySelector('.tt').textContent = s.title; h.querySelector('small').textContent = `${KIND_LABEL[s.kind] || ''} · ${ago(s.when)} · ${files.length === 1 ? tr('1 file') : tr('{n} files', { n: files.length })}`;
+      h.onclick = () => openSession(s); box.appendChild(h);
+      for (const a of files) {
+        const r = el('div', 'prow'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
+        r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${shortPath(a.path)}`;
+        const o = el('button', 'btn', tr('Open')); o.onclick = () => openArtifact(a);
+        const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path });
+        r.append(o, f); box.appendChild(r);
+      }
     }
   }
 
