@@ -413,7 +413,9 @@ async function checkAuth() {
     if (j) {
       const provider = j.apiProvider || 'firstParty';
       const connected = !!j.loggedIn || (provider !== 'firstParty' && provider !== 'none');
-      auth = { checked: true, connected, provider, loggedIn: !!j.loggedIn, cli: await cliVersion(),
+      // claude.ai login = usage included in the subscription; an API key or a cloud provider = pay per token.
+      const subscription = provider === 'firstParty' && j.authMethod === 'claude.ai' && !settingsEnv().ANTHROPIC_API_KEY;
+      auth = { checked: true, connected, provider, loggedIn: !!j.loggedIn, cli: await cliVersion(), billing: subscription ? 'subscription' : 'api', plan: subscription ? String(j.subscriptionType || '') : '',
         detail: connected ? '' : 'Not logged in.' };
     } else {
       auth = { checked: true, connected: null, provider: 'unknown', loggedIn: false, cli: await cliVersion(), detail: (r.stderr || r.stdout).trim().slice(0, 300) };

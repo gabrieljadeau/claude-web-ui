@@ -1361,11 +1361,19 @@
   function renderDashboard() {
     const D = S.dash; if (!D) return;
     const now = Date.now(); const day = 86400000; const d0 = new Date(); d0.setHours(0, 0, 0, 0);
-    const sum = (arr) => arr.reduce((a, u) => a + (u.cost || 0), 0);
+    // On a claude.ai subscription nothing is billed per token: the dashboard counts tokens instead of dollars.
+    const sub = S.auth?.billing === 'subscription';
+    const tok = (u) => (u.in || 0) + (u.out || 0);
+    const sum = (arr) => arr.reduce((a, u) => a + (sub ? tok(u) : (u.cost || 0)), 0);
+    const amount = (v) => (sub ? fmtK(v) : '$' + v.toFixed(2));
     const today = D.usage.filter((u) => u.at >= d0.getTime()), week = D.usage.filter((u) => u.at >= now - 7 * day), month = D.usage.filter((u) => u.at >= now - 30 * day);
     const stat = (v, l) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`;
-    $('dashStats').innerHTML = stat('$' + sum(today).toFixed(2), tr('Spent today')) + stat('$' + sum(week).toFixed(2), tr('Last 7 days')) + stat('$' + sum(month).toFixed(2), tr('Last 30 days')) + stat(fmtK(month.reduce((a, u) => a + (u.in || 0) + (u.out || 0), 0)), tr('Tokens, 30 days'));
-    $('dashNote').textContent = D.usage.length ? tr('{n} turns recorded. Estimates reported by Claude Code, not a bill.', { n: D.usage.length }) : tr('Spend is recorded from now on, for every turn run through this app.');
+    $('dashStats').innerHTML = sub
+      ? stat(fmtK(sum(today)), tr('Tokens today')) + stat(fmtK(sum(week)), tr('Last 7 days')) + stat(fmtK(sum(month)), tr('Last 30 days')) + stat(String(month.length), tr('Turns, 30 days'))
+      : stat('$' + sum(today).toFixed(2), tr('Spent today')) + stat('$' + sum(week).toFixed(2), tr('Last 7 days')) + stat('$' + sum(month).toFixed(2), tr('Last 30 days')) + stat(fmtK(month.reduce((a, u) => a + tok(u), 0)), tr('Tokens, 30 days'));
+    $('dashNote').textContent = sub ? tr('{n} turns recorded. Included in your {plan} subscription, nothing is billed per token.', { n: D.usage.length, plan: S.auth.plan || 'claude.ai' })
+      : D.usage.length ? tr('{n} turns recorded. Estimates reported by Claude Code, not a bill.', { n: D.usage.length }) : tr('Spend is recorded from now on, for every turn run through this app.');
+    $('dashBarsT').textContent = tr(sub ? 'Tokens, last 14 days' : 'Spend, last 14 days');
     const pend = $('dashPending'); pend.innerHTML = '';
     const waiting = D.items.filter((s) => s.status === 'waiting');
     if (!waiting.length) pend.appendChild(el('div', 'empty-note', tr('Nothing is waiting for you.')));
@@ -1383,15 +1391,15 @@
     for (const s of running) { const b = el('button', 'row'); b.innerHTML = '<span class="st running"></span><span class="t"><span class="tt"></span><small></small></span>'; b.querySelector('.tt').textContent = s.title; b.querySelector('small').textContent = `${KIND_LABEL[s.kind]} · ${s.kind === 'chat' ? '' : folderName(s.cwd) + ' · '}${ago(s.when)}`; b.onclick = () => openSession(s); run.appendChild(b); }
     const bars = $('dashBars'); bars.innerHTML = '';
     const days = []; for (let i = 13; i >= 0; i--) { const d = new Date(d0.getTime() - i * day); days.push({ d, v: 0 }); }
-    for (const u of D.usage) { const idx = Math.floor((u.at - (d0.getTime() - 13 * day)) / day); if (idx >= 0 && idx < 14) days[idx].v += u.cost || 0; }
+    for (const u of D.usage) { const idx = Math.floor((u.at - (d0.getTime() - 13 * day)) / day); if (idx >= 0 && idx < 14) days[idx].v += sub ? tok(u) : (u.cost || 0); }
     const max = Math.max(0.01, ...days.map((x) => x.v));
-    for (const x of days) { const b = el('div', 'b'); b.innerHTML = '<i></i><small></small>'; b.querySelector('i').style.height = Math.max(2, Math.round(x.v / max * 90)) + 'px'; b.title = `${x.d.toLocaleDateString()} · $${x.v.toFixed(2)}`; b.querySelector('small').textContent = x.d.toLocaleDateString(LOCALE, { weekday: 'short' })[0] + ' ' + x.d.getDate(); bars.appendChild(b); }
-    const agg = (key, label) => { const m = new Map(); for (const u of month) { const k = u[key] || 'unknown'; const a = m.get(k) || { cost: 0, n: 0, tok: 0 }; a.cost += u.cost || 0; a.n++; a.tok += (u.in || 0) + (u.out || 0); m.set(k, a); } const box = $(label); box.innerHTML = ''; if (!m.size) box.appendChild(el('div', 'empty-note', tr('No data yet.'))); for (const [k, a] of [...m.entries()].sort((x, y) => y[1].cost - x[1].cost)) { const r = el('div', 'kv'); r.innerHTML = '<span></span><span class="m"></span>'; r.querySelector('span').textContent = key === 'kind' ? (KIND_LABEL[k] || k) : shortModel(k); r.querySelector('.m').textContent = tr('${cost} · {n} turns · {tok} tok', { cost: a.cost.toFixed(2), n: a.n, tok: fmtK(a.tok) }); box.appendChild(r); } };
+    for (const x of days) { const b = el('div', 'b'); b.innerHTML = '<i></i><small></small>'; b.querySelector('i').style.height = Math.max(2, Math.round(x.v / max * 90)) + 'px'; b.title = `${x.d.toLocaleDateString()} · ${amount(x.v)}`; b.querySelector('small').textContent = x.d.toLocaleDateString(LOCALE, { weekday: 'short' })[0] + ' ' + x.d.getDate(); bars.appendChild(b); }
+    const agg = (key, label) => { const m = new Map(); for (const u of month) { const k = u[key] || 'unknown'; const a = m.get(k) || { cost: 0, n: 0, tok: 0 }; a.cost += u.cost || 0; a.n++; a.tok += (u.in || 0) + (u.out || 0); m.set(k, a); } const box = $(label); box.innerHTML = ''; if (!m.size) box.appendChild(el('div', 'empty-note', tr('No data yet.'))); for (const [k, a] of [...m.entries()].sort((x, y) => (sub ? y[1].tok - x[1].tok : y[1].cost - x[1].cost))) { const r = el('div', 'kv'); r.innerHTML = '<span></span><span class="m"></span>'; r.querySelector('span').textContent = key === 'kind' ? (KIND_LABEL[k] || k) : shortModel(k); r.querySelector('.m').textContent = sub ? tr('{n} turns · {tok} tok', { n: a.n, tok: fmtK(a.tok) }) : tr('${cost} · {n} turns · {tok} tok', { cost: a.cost.toFixed(2), n: a.n, tok: fmtK(a.tok) }); box.appendChild(r); } };
     agg('model', 'dashModels'); agg('kind', 'dashKinds');
     const ctx = $('dashContext'); ctx.innerHTML = '';
     const withCtx = D.items.filter((s) => s.context && s.context.window).slice(0, 8);
     if (!withCtx.length) ctx.appendChild(el('div', 'empty-note', tr('Context use appears for chats that ran through this app.')));
-    for (const s of withCtx) { const r = el('div', 'kv'); r.innerHTML = '<span class="n"></span><span class="ctx"><span class="bar"><i></i></span><span class="pct"></span></span>'; r.querySelector('.n').textContent = `${s.title} · ${KIND_LABEL[s.kind]}${s.cost ? ' · ~$' + s.cost.toFixed(2) : ''}`; renderCtx(r.querySelector('.ctx'), s.context); r.style.cursor = 'pointer'; r.onclick = () => openSession(s); ctx.appendChild(r); }
+    for (const s of withCtx) { const r = el('div', 'kv'); r.innerHTML = '<span class="n"></span><span class="ctx"><span class="bar"><i></i></span><span class="pct"></span></span>'; r.querySelector('.n').textContent = `${s.title} · ${KIND_LABEL[s.kind]}${s.cost && !sub ? ' · ~$' + s.cost.toFixed(2) : ''}`; renderCtx(r.querySelector('.ctx'), s.context); r.style.cursor = 'pointer'; r.onclick = () => openSession(s); ctx.appendChild(r); }
     const rb = $('dashRoutines'); rb.innerHTML = '';
     if (!D.routines.length) rb.appendChild(el('div', 'empty-note', tr('No routines. Create one from the Routines page.')));
     for (const r of D.routines) { const row = el('div', 'kv'); row.innerHTML = '<span></span><span class="m"></span>'; row.querySelector('span').textContent = r.name; const last = r.runs?.[0]; row.querySelector('.m').textContent = (r.enabled ? (r.nextRun ? tr('next {when}', { when: fmtWhen(r.nextRun) }) : tr('on')) : tr('paused')) + (last ? ' · ' + tr('last {status} {ago}', { status: last.ok === false ? tr('failed') : last.ok ? tr('ok') : tr('running'), ago: ago(last.at) }) : ''); row.style.cursor = 'pointer'; row.onclick = () => showRoutine(r.id); rb.appendChild(row); }
