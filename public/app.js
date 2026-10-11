@@ -1503,7 +1503,12 @@
   // artifacts; "Show all" (remembered per browser) lists the whole index anyway.
   let artAll = store.get('artAll', false);
   const ART_PAGE = /\.(html?|svg)$/i;
-  function visibleArts() { return artAll ? S.artifacts : S.artifacts.filter((a) => a.url || (a.action === 'Created' && a.kind !== 'code' && ART_PAGE.test(a.path))); }
+  // A published page shows once even when several branches of a conversation share the publish: the newest session keeps it.
+  function visibleArts() {
+    const seen = new Set();
+    return (artAll ? S.artifacts : S.artifacts.filter((a) => a.url || (a.action === 'Created' && a.kind !== 'code' && ART_PAGE.test(a.path))))
+      .slice().sort((a, b) => b.when - a.when).filter((a) => !a.url || (!seen.has(a.url) && seen.add(a.url)));
+  }
   const artName = (a) => a.name || base(a.path);
   function updateArtifactCount() { const n = visibleArts().length; $('artifactCount').textContent = n; $('artifactCount').hidden = !n; }
   $('artAll').checked = artAll;
