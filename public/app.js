@@ -1203,7 +1203,7 @@
     r.onresult = (e) => {
       let fin = '', inter = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const x = e.results[i]; if (x.isFinal) fin += x[0].transcript; else inter += x[0].transcript; }
       if (fin) { baseText = (baseText ? baseText.replace(/\s*$/, ' ') : '') + fin.trim(); ta.value = baseText; autosize(); } interimEl.textContent = inter;
-      clearTimeout(silence); if (handsFree() && !inter && ta.value.trim()) silence = setTimeout(() => { if (api.active && ta.value.trim()) onSilence(); }, 1500);
+      clearTimeout(silence); if (handsFree() && !inter && ta.value.trim()) silence = setTimeout(() => { if (api.active && ta.value.trim()) onSilence(); }, 3000);
     };
     api.start = () => { speechSynthesis?.cancel(); wanted = true; r.lang = S.settings.lang || 'fr-FR'; try { r.start(); } catch { /* already started */ } };
     api.stop = () => { wanted = false; clearTimeout(silence); r.stop(); };
