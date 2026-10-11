@@ -571,13 +571,14 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 
 .panel-side .used { padding-top: 6px; }
 
-/* ---- voice mode (public/voice.js) */
-.voice { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 14px 16px 18px; }
-.voice[hidden] { display: none; }
-.voice-top { width: 100%; display: flex; align-items: center; gap: 6px; }
-.voice-status { color: var(--muted); font-size: 13.5px; min-height: 20px; padding-left: 6px; }
-.voice-mid { flex: 1; display: grid; place-items: center; width: 100%; min-height: 200px; }
-.orb { position: relative; width: 170px; height: 170px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: radial-gradient(circle at 36% 34%, #f6d2c2, var(--accent) 72%); box-shadow: 0 12px 44px rgba(217,119,87,.35); transition: transform .25s, background .3s, box-shadow .3s; }
+/* ---- voice mode (public/voice.js): a pane at the top of the right column; "Full screen" gives the big view */
+.pane.voice { flex: 1 1 320px; max-height: 440px; } .pane.voice.full { max-height: none; }
+.voice-status { color: var(--muted); font-size: 12.5px; }
+.vlang { font-size: 12px; padding: 3px 22px 3px 8px; border-radius: 8px; max-width: 120px; }
+.voice-body { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 10px 14px 14px; overflow: auto; }
+.voice-mid { flex: 1; display: grid; place-items: center; width: 100%; min-height: 120px; }
+.orb { position: relative; width: 96px; height: 96px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: radial-gradient(circle at 36% 34%, #f6d2c2, var(--accent) 72%); box-shadow: 0 10px 34px rgba(217,119,87,.35); transition: transform .25s, background .3s, box-shadow .3s; }
+.pane.voice.full .orb { width: 170px; height: 170px; } .pane.voice.full .voice-mid { min-height: 200px; }
 .orb span { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; pointer-events: none; }
 .voice[data-state="listening"] .orb { animation: orbBreathe 2.6s ease-in-out infinite; }
 .voice[data-state="listening"] .orb span { animation: orbRing 2.6s ease-out infinite; }
@@ -588,11 +589,12 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 @keyframes orbBreathe { 50% { transform: scale(1.06); } }
 @keyframes orbRing { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.7); opacity: 0; } }
 @keyframes orbTalk { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.09); } 60% { transform: scale(.97); } }
-.voice-reply { max-width: 640px; width: 100%; text-align: center; font-family: var(--serif); font-size: 19px; line-height: 1.5; color: var(--ink); min-height: 58px; max-height: 32vh; overflow-y: auto; }
-.voice-transcript { max-width: 640px; width: 100%; text-align: center; color: var(--muted); font-size: 15px; min-height: 24px; margin: 10px 0 20px; }
-.voice-bottom { display: flex; gap: 12px; }
-.vbtn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 10px 18px; font-size: 14px; color: var(--ink); }
-.vbtn svg { width: 18px; height: 18px; } .vbtn:hover { background: var(--soft); }
+.voice-reply { max-width: 640px; width: 100%; text-align: center; font-family: var(--serif); font-size: 15.5px; line-height: 1.5; color: var(--ink); min-height: 46px; max-height: 32vh; overflow-y: auto; }
+.pane.voice.full .voice-reply { font-size: 19px; } .pane.voice.full .voice-transcript { font-size: 15px; }
+.voice-transcript { max-width: 640px; width: 100%; text-align: center; color: var(--muted); font-size: 13px; min-height: 20px; margin: 6px 0 12px; }
+.voice-bottom { display: flex; gap: 10px; }
+.vbtn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 7px 14px; font-size: 13px; color: var(--ink); }
+.vbtn svg { width: 16px; height: 16px; } .vbtn:hover { background: var(--soft); }
 .vbtn.end { background: var(--dark); color: var(--dark-ink); border-color: var(--dark); } .vbtn.end:hover { opacity: .9; }
 .vbtn.on { color: var(--danger); border-color: var(--danger); }
 .composer-box .icon.vm { color: var(--muted); } .composer-box .icon.vm:hover { color: var(--accent); }

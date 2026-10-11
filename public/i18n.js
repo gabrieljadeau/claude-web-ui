@@ -16,7 +16,7 @@
     'Mute': ["Couper le micro", "Silenciar", "Disattiva microfono", "Stumm"],
     'Unmute': ["Réactiver le micro", "Activar micrófono", "Riattiva microfono", "Mikrofon an"],
     'End': ["Terminer", "Terminar", "Termina", "Beenden"],
-    'Back to text': ["Revenir au texte", "Volver al texto", "Torna al testo", "Zurück zum Text"],
+    'Voice mode switched to {x}': ["Mode vocal passé en {x}", "Modo de voz cambiado a {x}", "Modalità vocale passata a {x}", "Sprachmodus auf {x} umgestellt"],
     'End voice mode': ["Quitter le mode vocal", "Salir del modo de voz", "Esci dalla modalità vocale", "Sprachmodus beenden"],
     'Tap to interrupt, or to send what you said': ["Touchez pour interrompre, ou pour envoyer ce que vous avez dit", "Toca para interrumpir o para enviar lo que dijiste", "Tocca per interrompere o per inviare ciò che hai detto", "Tippen zum Unterbrechen oder zum Senden des Gesagten"],
     'Voice mode needs Google Chrome or Microsoft Edge.': ["Le mode vocal nécessite Google Chrome ou Microsoft Edge.", "El modo de voz necesita Google Chrome o Microsoft Edge.", "La modalità vocale richiede Google Chrome o Microsoft Edge.", "Der Sprachmodus braucht Google Chrome oder Microsoft Edge."],

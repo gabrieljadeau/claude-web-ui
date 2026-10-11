@@ -502,7 +502,7 @@ function queryOptions(rt, ac) {
   const append = [PROMPTS.common, PROMPTS[kind]];
   const browser = rt.browser && kind !== 'chat';
   if (browser) append.push(PROMPTS.browser);
-  if (rt.voice) append.push(PROMPTS.voice);
+  if (rt.voice) { append.push(PROMPTS.voice); if (rt.voiceLang) append.push(`The speech recognizer was set to ${rt.voiceLang}. If the user's words read like another language transcribed wrongly, they probably spoke that language. Start your reply with the tag [lang:xx-XX] giving the BCP-47 code of the language the user actually spoke (one of fr-FR, es-ES, en-US, it-IT, de-DE; keep ${rt.voiceLang} when unsure or when the words are too short to tell), then answer in that language.`); }
   const opts = {
     cwd: rt.cwd,
     resume: rt.sdkId || undefined,
@@ -1149,6 +1149,7 @@ wss.on('connection', async (ws) => {
           let text = msg.text.trim();
           if (!text && files.length) text = 'Please look at the attached files.';
           rt.voice = !!msg.voice;   // spoken turn: the reply is written to be read aloud
+          rt.voiceLang = rt.voice && typeof msg.lang === 'string' && /^[a-z]{2}(-[A-Z]{2})?$/.test(msg.lang) ? msg.lang : '';   // recognizer language, so Claude can tell when another one was spoken
           if (!text) break;
           if (msg.edit) {
             // Edit / retry: continue from a copy of the conversation cut just before the edited message.

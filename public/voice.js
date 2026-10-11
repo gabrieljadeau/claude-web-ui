@@ -11,13 +11,14 @@
   };
   const getSR = () => window.SpeechRecognition || window.webkitSpeechRecognition;
   const TTS = window.speechSynthesis;
-  const PAUSE_MS = 1400;            // silence after the last words before they are sent
+  const PAUSE_MS = 1200;            // silence after the last words before they are sent (counted from the last interim result too, Chrome finalizes late)
   const MIN_BARGE_WORDS = 3;        // words needed to interrupt Claude while it speaks (filters noise and echo)
 
   let app = null;                   // bridge given by app.js: { lang(), send(text), stop(), toast(msg, bad) }
   let open = false, state = 'idle', muted = false, turnRunning = false;
   let rec = null, recActive = false, recWanted = false;
-  let heard = '', silenceTimer = 0;
+  let heard = '', interim = '', silenceTimer = 0, lastSent = '', lastSentAt = 0;
+  let tagDone = false;              // the [lang:xx-XX] tag at the start of the reply has been read (or there is none)
   let buffer = '', spokenRecent = '', queued = 0;
 
   const norm = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -56,19 +57,24 @@
       if (!txt || txt.split(/\s+/).length < MIN_BARGE_WORDS || isEcho(txt)) return;
       interrupt();
     }
-    if (fin) heard = (heard ? heard.replace(/\s*$/, ' ') : '') + fin;
+    if (fin) {
+      // Chrome finalizes words seconds after they were spoken: the interim text may already have been sent, skip the duplicate
+      if (lastSent && Date.now() - lastSentAt < 6000 && norm(lastSent).includes(norm(fin))) return;
+      heard = (heard ? heard.replace(/\s*$/, ' ') : '') + fin;
+    }
+    interim = inter;
     $('voiceTranscript').textContent = heard + (inter ? (heard ? ' ' : '') + inter : '');
     clearTimeout(silenceTimer);
-    if (heard && !inter) silenceTimer = setTimeout(sendHeard, PAUSE_MS);
+    if ((heard + inter).trim()) silenceTimer = setTimeout(sendHeard, PAUSE_MS);
   }
   function sendHeard() {
     clearTimeout(silenceTimer);
-    const text = heard.trim(); if (!text || !open) return;
-    heard = ''; $('voiceTranscript').textContent = text; $('voiceReply').textContent = '';
-    buffer = ''; spokenRecent = ''; queued = 0; turnRunning = true;
+    const text = (heard + (interim ? (heard ? ' ' : '') + interim : '')).trim(); if (!text || !open) return;
+    heard = ''; interim = ''; lastSent = text; lastSentAt = Date.now(); $('voiceTranscript').textContent = text; $('voiceReply').textContent = '';
+    buffer = ''; spokenRecent = ''; queued = 0; turnRunning = true; tagDone = false;
     setState('thinking'); app.send(text);
   }
-  function interrupt() { cancelSpeech(); if (turnRunning) app.stop(); turnRunning = false; buffer = ''; heard = ''; setState(muted ? 'muted' : 'listening'); }
+  function interrupt() { cancelSpeech(); if (turnRunning) app.stop(); turnRunning = false; buffer = ''; heard = ''; interim = ''; setState(muted ? 'muted' : 'listening'); }
 
   // ---- synthesis
   function voices() { return TTS ? TTS.getVoices() : []; }
@@ -137,10 +143,34 @@
   function afterSpeech() { if (!open) return; heard = ''; setState(muted ? 'muted' : 'listening'); }
   function cancelSpeech() { queued = 0; try { TTS?.cancel(); } catch { /* ignore */ } }
 
+  // ---- spoken language: Claude starts each voice reply with [lang:xx-XX], the language it heard (the recognizer may have
+  // been set to another one). The tag is removed from what is read aloud; when it differs, listening and speaking switch to it.
+  const TAG = /^\s*\[lang:([a-z]{2})(?:-([a-z]{2}))?\]\s*/i;
+  function readTag(final) {
+    if (tagDone) return true;
+    const m = buffer.match(TAG);
+    if (m) {
+      buffer = buffer.slice(m[0].length); tagDone = true;
+      const code = m[1].toLowerCase() + (m[2] ? '-' + m[2].toUpperCase() : '');
+      const cur = app.lang(); if (code.slice(0, 2) !== cur.slice(0, 2)) switchLang(code);
+      return true;
+    }
+    if (!final && buffer.length < 24 && /^\s*(\[(l(a(n(g(:[^\]]*)?)?)?)?)?)?$/i.test(buffer)) return false;   // tag still arriving
+    tagDone = true; return true;
+  }
+  function switchLang(code) {
+    const src = $('setLang'); if (!src) return;
+    const opts = [...src.options].map((o) => o.value);
+    const pick = opts.find((v) => v === code) || opts.find((v) => v.slice(0, 2) === code.slice(0, 2)); if (!pick) return;
+    app.setLang(pick); const sel = $('voiceLang'); if (sel) sel.value = pick;
+    if (recWanted) { try { rec.stop(); } catch { /* restarts with the new language via onend */ } }
+    populateVoices(); app.toast(tr('Voice mode switched to {x}', { x: src.options[opts.indexOf(pick)].textContent }));
+  }
+
   // ---- events forwarded by app.js
-  function onDelta(t) { if (!open || !turnRunning) return; buffer += t; flushSentences(false); }
-  function onAssistantText() { if (!open || !turnRunning) return; flushSentences(true); }
-  function onDone() { if (!open) return; turnRunning = false; flushSentences(true); if (!queued) afterSpeech(); }
+  function onDelta(t) { if (!open || !turnRunning) return; buffer += t; if (readTag(false)) flushSentences(false); }
+  function onAssistantText() { if (!open || !turnRunning) return; readTag(true); flushSentences(true); }
+  function onDone() { if (!open) return; turnRunning = false; readTag(true); flushSentences(true); if (!queued) afterSpeech(); }
   function onStatus(status) {
     if (!open) return;
     if (status === 'waiting') { turnRunning = true; say(tr('I need your approval in the chat before I can continue.')); }
@@ -150,21 +180,21 @@
   // ---- view
   function openView() {
     if (!getSR()) { app.toast(tr('Voice mode needs Google Chrome or Microsoft Edge.'), true); return; }
-    open = true; muted = false; heard = ''; buffer = ''; turnRunning = false;
-    const v = $('voiceView'); v.hidden = false; document.body.classList.add('voice-open');
+    open = true; muted = false; heard = ''; interim = ''; buffer = ''; turnRunning = false;
+    app.pane(true); document.body.classList.add('voice-open');
     $('voiceTranscript').textContent = ''; $('voiceReply').textContent = tr('Say something, I am listening.');
     populateLangs(); syncMute(); startListening();
   }
   function closeView() {
     if (!open) return;
     open = false; stopListening(); cancelSpeech(); clearTimeout(silenceTimer);
-    $('voiceView').hidden = true; document.body.classList.remove('voice-open'); setState('idle');
+    document.body.classList.remove('voice-open'); setState('idle'); app.pane(false);
   }
   function syncMute() { const b = $('voiceMute'); b.classList.toggle('on', muted); b.querySelector('span').textContent = muted ? tr('Unmute') : tr('Mute'); }
-  function toggleMute() { muted = !muted; syncMute(); heard = ''; $('voiceTranscript').textContent = ''; if (state === 'listening' || state === 'muted') setState(muted ? 'muted' : 'listening'); }
+  function toggleMute() { muted = !muted; syncMute(); heard = ''; interim = ''; $('voiceTranscript').textContent = ''; if (state === 'listening' || state === 'muted') setState(muted ? 'muted' : 'listening'); }
   function orbTap() {
     if (state === 'speaking' || state === 'thinking') interrupt();
-    else if (heard.trim()) sendHeard();
+    else if ((heard + interim).trim()) sendHeard();
   }
 
   // ---- settings (voice picker, rate, test)
@@ -184,7 +214,7 @@
     sel.value = app.lang();
   }
   function changeLang(code) {
-    app.setLang(code); cancelSpeech(); heard = ''; $('voiceTranscript').textContent = '';
+    app.setLang(code); cancelSpeech(); heard = ''; interim = ''; $('voiceTranscript').textContent = '';
     if (recWanted) { try { rec.stop(); } catch { /* restarts with the new language via onend */ } }
     populateVoices();
   }
@@ -198,10 +228,9 @@
 
   function init(bridge) {
     app = bridge;
-    $('voiceClose').onclick = closeView; $('voiceEnd').onclick = closeView; $('voiceText').onclick = closeView;
-    $('voiceMute').onclick = toggleMute; $('voiceOrb').onclick = orbTap;
+    $('voiceEnd').onclick = closeView; $('voiceMute').onclick = toggleMute; $('voiceOrb').onclick = orbTap;
     $('voiceLang').onchange = (e) => changeLang(e.target.value);
-    window.addEventListener('keydown', (e) => { if (open && e.key === 'Escape') closeView(); });
+    window.addEventListener('keydown', (e) => { if (open && e.key === 'Escape' && !e.target.closest?.('input, textarea, [contenteditable]')) closeView(); });
     wireSettings();
   }
 

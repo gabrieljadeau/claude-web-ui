@@ -368,7 +368,7 @@
     if (info.status !== 'idle') showWorking(info.status === 'waiting' ? tr('Waiting for your approval') : null);
     editing = null; $('editHint').hidden = true; renderQueue(); panesOnSession();
     scrollDown(true); sessionComposer.focus();
-    if (pendingFirst) { const m = pendingFirst; pendingFirst = null; send({ type: 'send', sid: info.sid, text: m.text, files: m.files, voice: !!m.voice }); }
+    if (pendingFirst) { const m = pendingFirst; pendingFirst = null; send({ type: 'send', sid: info.sid, text: m.text, files: m.files, voice: !!m.voice, lang: m.lang }); }
   }
   function renderSessionHead() {
     const i = S.info; if (!i) return;
@@ -742,15 +742,16 @@
   // ------------------------------------------------------------- panes: Browser, Files, Terminal, Progress
   // Stacked on the right of the chat; each can be closed, put full screen and resized (drag the handles between
   // them, or the left edge of the column). Which ones are open is remembered per browser.
-  const PANES = ['browser', 'files', 'term', 'progress'];
-  const PANE_EL = { browser: 'paneBrowser', files: 'paneFiles', term: 'paneTerm', progress: 'paneProgress' };
+  // 'voice' has no header button and is never remembered: voice.js opens and closes it.
+  const PANES = ['voice', 'browser', 'files', 'term', 'progress'];
+  const PANE_EL = { voice: 'voiceView', browser: 'paneBrowser', files: 'paneFiles', term: 'paneTerm', progress: 'paneProgress' };
   const PANE_BTN = { browser: 'browserBtn', files: 'filesBtn', term: 'termBtn', progress: 'panelBtn' };
-  const paneState = Object.assign({ browser: false, files: false, term: false, progress: true }, store.get('panes', {}));
+  const paneState = Object.assign({ browser: false, files: false, term: false, progress: true }, store.get('panes', {}), { voice: false });
   let fullPane = null;
   function layoutPanes() {
     document.body.classList.toggle('panel-open', PANES.some((n) => paneState[n]));
-    store.set('panes', paneState);
-    for (const n of PANES) { $(PANE_EL[n]).hidden = !paneState[n]; $(PANE_BTN[n]).classList.toggle('on', paneState[n]); }
+    store.set('panes', { ...paneState, voice: undefined });
+    for (const n of PANES) { $(PANE_EL[n]).hidden = !paneState[n]; $(PANE_BTN[n])?.classList.toggle('on', paneState[n]); }
     let before = false;
     for (const c of $('panel').children) {
       if (c.classList.contains('pane')) { before = before || !c.hidden; continue; }
@@ -774,7 +775,7 @@
     const p = $(PANE_EL[n]);
     p.querySelector('.pane-close').onclick = () => togglePane(n, false);
     p.querySelector('.pane-full').onclick = () => setFull(n);
-    $(PANE_BTN[n]).onclick = () => (n === 'progress' ? openPanel(!paneState.progress, true) : togglePane(n));
+    if (PANE_BTN[n]) $(PANE_BTN[n]).onclick = () => (n === 'progress' ? openPanel(!paneState.progress, true) : togglePane(n));
   }
   // resize: the column width (left edge) and the pane heights (handles between panes)
   const PANEL_MIN = 300;
@@ -804,11 +805,11 @@
     if (n === 'term') termInit();
     if (n === 'progress') renderPanel();
   }
-  function paneHidden(n) { if (n === 'browser') send({ type: 'browserWatch', on: false }); }
+  function paneHidden(n) { if (n === 'browser') send({ type: 'browserWatch', on: false }); if (n === 'voice') window.Voice?.close(); }
   function paneAutoOpen(n) { if (!paneState[n] && !paneUserClosed[n]) togglePane(n, true); }
   const paneUserClosed = {}; const workPanes = {};
   for (const n of PANES) $(PANE_EL[n]).querySelector('.pane-close').addEventListener('click', () => { paneUserClosed[n] = true; });
-  function syncPaneBtns() { for (const n of PANES) $(PANE_BTN[n]).classList.toggle('on', paneState[n]); }
+  function syncPaneBtns() { for (const n of PANES) $(PANE_BTN[n])?.classList.toggle('on', paneState[n]); }
   // a new session was opened in the view: reset per-session content
   function panesOnSession() {
     for (const n of PANES) paneUserClosed[n] = false;
@@ -1091,7 +1092,9 @@
     });
     return html;
   }
+  const LANG_TAG = /^\s*\[lang:[a-z]{2}(?:-[a-z]{2})?\]\s*/i;   // voice turns start with the detected language; voice.js reads it, the chat hides it
   function renderInto(node, src, final) {
+    src = String(src).replace(LANG_TAG, '');
     node.innerHTML = md(src); node.dataset.raw = src;
     if (final) for (const pre of node.querySelectorAll('pre')) { const lbl = tr('Copy'); const b = el('button', 'copy-btn', lbl); b.onclick = () => { const t = pre.innerText; copyText(t.endsWith(lbl) ? t.slice(0, -lbl.length) : t); }; pre.appendChild(b); }
     for (const im of node.querySelectorAll('img.md-img')) im.onclick = () => openImageSrc(im.src, im.dataset.path || tr('Image'));
@@ -1204,7 +1207,7 @@
       acts.append(now, x); d.append(b, acts); box.appendChild(d);
     }
   }
-  function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files, voice: !!m.voice }); }
+  function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files, voice: !!m.voice, lang: m.lang }); }
   // Inside the welcome composer: Chat/Cowork toggle and project folder on the left, the model picker on the right (like claude.ai).
   welcomeComposer.slot.append($('kindSeg'), $('projectChip'), $('modeChip')); welcomeComposer.slotR.prepend($('modelChip'));
   $('welcomeChips').remove();
@@ -1768,11 +1771,13 @@
     toast,
     setLang(code) { S.settings.lang = code; const sel = $('setLang'); if (sel) sel.value = code; send({ type: 'settings', lang: code }); },
     stop() { if (S.view === 'session' && S.sid) send({ type: 'stop', sid: S.sid }); },
+    pane(v) { togglePane('voice', v); },
     send(text) {
+      const lang = S.settings.lang || LOCALE || 'fr-FR';
       if (S.view === 'session' && S.info) {
-        if (S.info.status !== 'idle') { const q = queues.get(S.sid) || []; q.push({ text, files: [], voice: true }); queues.set(S.sid, q); renderQueue(); send({ type: 'stop', sid: S.sid }); }
-        else send({ type: 'send', sid: S.sid, text, files: [], voice: true });
-      } else { pendingFirst = { text, files: [], voice: true }; send({ type: 'new', kind: 'chat', cwd: '' }); }
+        if (S.info.status !== 'idle') { const q = queues.get(S.sid) || []; q.push({ text, files: [], voice: true, lang }); queues.set(S.sid, q); renderQueue(); send({ type: 'stop', sid: S.sid }); }
+        else send({ type: 'send', sid: S.sid, text, files: [], voice: true, lang });
+      } else { pendingFirst = { text, files: [], voice: true, lang }; send({ type: 'new', kind: 'chat', cwd: '' }); }
     },
   });
   resetView(); setTab(S.tab); showWelcome(); connect();
