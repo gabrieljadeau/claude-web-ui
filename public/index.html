@@ -81,6 +81,7 @@
     </div>
   </nav>
   <div class="sb-list" id="list"></div>
+  <button class="sb-update" id="updateBtn" hidden><svg><use href="#i-retry"/></svg><span>Relaunch to update</span></button>
   <div class="sb-foot">
     <button class="user" id="userBtn" title="Account and settings">
       <span class="avatar" id="avatar">G</span>
@@ -364,6 +365,7 @@
       <div class="set-row"><div><b>Transcript width</b><small>Maximum width of the transcript and composer.</small></div><div class="pills small" id="widthPills"><button data-v="n">Narrow</button><button data-v="m">Medium</button><button data-v="w">Wide</button></div></div>
       <div class="set-row"><div><b>Show archived chats</b><small>Archived chats stay on disk but are hidden from Recents.</small></div><label class="switch"><input type="checkbox" id="setArchived"><span></span></label></div>
       <p class="muted small" id="aboutLine"></p>
+      <p class="muted small"><button class="btn link" id="updateCheck" style="padding:0">Check for updates</button></p>
     </div>
     <div data-page="connection" class="set-page" hidden>
       <h3>Connection</h3>

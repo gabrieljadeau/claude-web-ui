@@ -52,6 +52,7 @@
     switch (m.type) {
       case 'hello':
         Object.assign(S, { home: m.home, user: m.user, chatDir: m.chatDir, version: m.version, settings: m.settings, auth: m.auth, routines: m.routines, repo: m.repo });
+        try { if (sessionStorage.getItem('updating')) { sessionStorage.removeItem('updating'); toast(tr('Updated to {v}', { v: m.version })); } } catch { /* private window */ }
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
@@ -59,6 +60,7 @@
       case 'routines': S.routines = m.items; if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); break;
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
+      case 'update': S.update = m; renderUpdate(); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
@@ -90,6 +92,17 @@
   function setUser(u) { S.user = u; $('userName').textContent = u; $('avatar').textContent = (u || 'U').charAt(0).toUpperCase(); }
 
   // ---------------------------------------------------------------- auth
+  function renderUpdate() {
+    const u = S.update || {}, b = $('updateBtn');
+    if (u.manual) { if (u.error) toast(tr('Could not check for updates: {e}', { e: u.error }), true); else if (!u.available) toast(tr('You have the latest version')); }
+    else if (u.failed) toast(tr('Update failed: {e}', { e: u.error }), true);
+    b.hidden = !u.available; b.disabled = !!u.applying;
+    const steps = { pull: tr('Pulling the latest version…'), install: tr('Installing dependencies…'), relaunch: tr('Relaunching…') };
+    b.querySelector('span').textContent = u.applying ? steps[u.step] || tr('Updating…') : tr('Relaunch to update');
+    b.title = u.available ? tr('{n} new commit(s)', { n: u.behind }) + (u.log?.length ? '\n' + u.log.join('\n') : '') : '';
+  }
+  $('updateBtn').onclick = () => { try { sessionStorage.setItem('updating', '1'); } catch { /* ignore */ } S.update = { ...S.update, applying: true, step: 'pull' }; renderUpdate(); send({ type: 'updateApply' }); };
+  $('updateCheck').onclick = () => { toast(tr('Checking for updates…')); send({ type: 'updateCheck' }); };
   function renderAuth() {
     const a = S.auth || {}; const dot = $('authDot'), label = $('authLabel');
     const prov = { bedrock: 'Amazon Bedrock', vertex: 'Google Vertex', foundry: 'Microsoft Foundry', firstParty: tr('Claude account') }[a.provider] || 'Claude';

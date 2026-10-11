@@ -24,5 +24,5 @@ if not exist node_modules (
   )
 )
 
-node server.mjs
+node scripts/launch.mjs
 pause

@@ -93,6 +93,9 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 .row .more:hover { background: var(--line); }
 .row .pin { flex: none; font-size: 11px; }
 .empty-list { color: var(--muted); font-size: 13px; padding: 14px 10px; text-align: center; }
+.sb-update { display: flex; align-items: center; gap: 8px; margin: 4px 8px 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); font-size: 13px; text-align: left; }
+.sb-update:hover { background: var(--soft); } .sb-update:disabled { opacity: .6; } .sb-update svg { width: 15px; height: 15px; flex: none; color: var(--muted); }
+.sb-update span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-foot { display: flex; align-items: center; gap: 2px; padding: 6px 8px 8px; }
 .user { flex: 1; display: flex; align-items: center; gap: 7px; border: 0; background: none; padding: 4px 6px; border-radius: 8px; text-align: left; min-width: 0; }
 .user:hover { background: var(--hover); } .user .chev { width: 12px; height: 12px; color: var(--muted); flex: none; } .user .dot { width: 6px; height: 6px; }

@@ -29,7 +29,7 @@ import {
 // ---------------------------------------------------------------- 1. config
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.PORT || 3737);
-const TOKEN = crypto.randomBytes(16).toString('hex');
+const TOKEN = process.env.CLAUDE_WEB_UI_TOKEN || crypto.randomBytes(16).toString('hex');   // kept across a "Relaunch to update" so open tabs reconnect
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
 const IS_WIN = process.platform === 'win32';
@@ -1039,6 +1039,7 @@ wss.on('connection', async (ws) => {
   clients.add(ws);
   const send = (obj) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); };
   send({ type: 'hello', platform: process.platform, home: os.homedir(), user: displayName(), chatDir: CHAT_DIR, version: APP_VERSION, settings: publicSettings(), auth, routines: state.routines, repo: state.settings.repo || REPO, token: TOKEN });
+  send({ type: 'update', ...update });
   send({ type: 'sessions', items: await sidebar(), projects: projects() });
   if (!auth.checked) checkAuth();
 
@@ -1305,6 +1306,8 @@ wss.on('connection', async (ws) => {
         case 'termRun': if (rt && typeof msg.cmd === 'string') termRun(rt, msg.cmd); break;
         case 'termKill': if (rt) { termKill(rt); const t = termOpen(rt); send({ type: 'termOpened', sid: rt.localId, shell: t.shell, cwd: rt.cwd, restarted: true }); } break;
         case 'authCheck': send({ type: 'auth', auth: await checkAuth() }); break;
+        case 'updateCheck': send({ type: 'update', ...(await checkUpdate()), manual: true }); break;
+        case 'updateApply': applyUpdate(); break;
         case 'authLogin': openLoginTerminal(); break;
         case 'authTest': {
           // one tiny real request to prove the connection works end to end
@@ -1397,6 +1400,57 @@ function detectRepo() {
   return 'gabrieljadeau/claude-web-ui';
 }
 
+// ---------------------------------------------------------------- updates
+// The app is a git checkout: "git fetch" tells whether the upstream branch moved. "Relaunch to update" pulls, installs and
+// restarts the server; the token is passed to the new process so open tabs reconnect on their own.
+const update = { available: false, behind: 0, log: [], checked: 0, applying: false, step: '', error: '' };
+async function git(args, timeout = 15000) { return runCmd('git', ['-C', ROOT, ...args], timeout); }
+async function checkUpdate() {
+  update.error = '';
+  const up = await git(['rev-parse', '--abbrev-ref', '@{u}']);
+  if (up.err || !up.stdout.trim()) { update.available = false; update.checked = Date.now(); return update; }   // not a git checkout, or no upstream
+  const f = await git(['fetch', '--quiet'], 30000);
+  if (f.err) { update.error = (f.stderr || f.err.message).trim().split('\n').pop().slice(0, 200); update.checked = Date.now(); broadcast({ type: 'update', ...update }); return update; }
+  const n = await git(['rev-list', '--count', 'HEAD..@{u}']);
+  update.behind = Number(n.stdout.trim()) || 0;
+  update.available = update.behind > 0;
+  update.log = update.available ? (await git(['log', '--format=%s', '-n', '6', 'HEAD..@{u}'])).stdout.trim().split('\n').filter(Boolean) : [];
+  update.checked = Date.now();
+  broadcast({ type: 'update', ...update });
+  return update;
+}
+async function applyUpdate() {
+  if (update.applying) return;
+  update.applying = true; update.error = '';
+  const step = (s) => { update.step = s; broadcast({ type: 'update', ...update }); console.log(`  Update: ${s}`); };
+  const fail = (e) => { update.applying = false; update.step = ''; update.error = String(e).slice(0, 300); broadcast({ type: 'update', ...update, failed: true }); console.error(`  Update failed: ${update.error}`); };
+  step('pull');
+  const dirty = await git(['status', '--porcelain', '--untracked-files=no']);
+  if (dirty.stdout.trim()) return fail('Local changes in the app folder. Commit or stash them, then try again.');
+  const pull = await git(['pull', '--ff-only', '--quiet'], 120000);
+  if (pull.err) return fail((pull.stderr || pull.err.message).trim().split('\n').pop());
+  step('install');
+  const npm = await runCmd(IS_WIN ? 'npm.cmd' : 'npm', ['install', '--no-fund', '--no-audit', '--prefix', ROOT], 300000);
+  if (npm.err) return fail((npm.stderr || npm.err.message).trim().split('\n').pop());
+  step('relaunch');
+  setTimeout(relaunch, 300);
+}
+function relaunch() {
+  // Stop what we own (terminals, dev servers, running turns), free the port, then start the new code.
+  for (const rt of runtimes.values()) { try { termKill(rt); rt.abort?.abort(); } catch { /* ignore */ } }
+  for (const d of devServers.values()) if (d.proc) launchStop(d.cwd, d.name).catch(() => {});
+  for (const ws of clients) { try { ws.close(); } catch { /* ignore */ } }
+  server.close(() => {
+    if (process.env.CLAUDE_WEB_UI_SUPERVISED) { console.log('  Restarting…\n'); process.exit(75); }   // scripts/launch.mjs starts us again
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], { cwd: ROOT, env: { ...process.env, NO_OPEN: '1', CLAUDE_WEB_UI_TOKEN: TOKEN }, stdio: 'inherit', detached: !IS_WIN, windowsHide: true });
+    child.unref();
+    console.log(`  Restarted as process ${child.pid}. Stop it with: kill ${child.pid}\n`);
+    process.exit(0);
+  });
+  server.closeAllConnections?.();
+  setTimeout(() => process.exit(process.env.CLAUDE_WEB_UI_SUPERVISED ? 75 : 0), 5000).unref();
+}
+
 // "Request a fix": files a GitHub issue. Uses a token from settings, else the gh CLI, else hands back a prefilled new-issue link.
 async function fileIssue(msg) {
   const repo = state.settings.repo || REPO;
@@ -1448,6 +1502,7 @@ server.listen(PORT, HOST, () => {
   checkAuth();
   listing();
   openBrowser(URL_WITH_TOKEN);
+  setTimeout(checkUpdate, 8000); setInterval(checkUpdate, 30 * 60 * 1000).unref();
 });
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') console.error(`Port ${PORT} is already in use. Close the other window or set PORT=3738.`);
