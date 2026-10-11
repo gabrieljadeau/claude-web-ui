@@ -1301,8 +1301,26 @@
   function showArtifacts() { showView('artifacts'); send({ type: 'artifacts' }); renderArtifacts(); $('artifactFilter').focus({ preventScroll: true }); }
   function openArtifact(a) { if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } }
   $('artifactFilter').oninput = renderArtifacts;
+  // List or grid, like Google Drive's switcher; the grid shows a preview "screenshot" of each file.
+  let artView = store.get('artView', 'list');
+  $('artView').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; artView = b.dataset.v; store.set('artView', artView); renderArtifacts(); };
+  const TEXT_EXT = ['md', 'markdown', 'txt', 'csv', 'json', 'js', 'mjs', 'ts', 'tsx', 'jsx', 'py', 'rb', 'sh', 'css', 'scss', 'yml', 'yaml', 'toml', 'xml', 'sql', 'html', 'htm', 'svg', 'log', 'env', 'ini'];
+  function artPreview(a) {
+    const box = el('div', 'apv'); const ext = (base(a.path).split('.').pop() || '').toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { const im = el('img'); im.src = fileUrl(a.path); im.alt = ''; im.loading = 'lazy'; box.appendChild(im); box.classList.add('img'); }
+    else if (['html', 'htm', 'svg'].includes(ext)) {
+      // a live, scaled-down render of the page as the thumbnail
+      const f = el('iframe'); f.setAttribute('sandbox', ''); f.src = fileUrl(a.path); f.loading = 'lazy'; f.tabIndex = -1; box.appendChild(f); box.classList.add('page');
+      requestAnimationFrame(() => { box.style.setProperty('--s', (box.clientWidth / 1000).toFixed(3)); });
+    } else if (TEXT_EXT.includes(ext)) {
+      const pre = el('pre', null, '…'); box.appendChild(pre); box.classList.add('txt');
+      fetch(fileUrl(a.path, true)).then((r) => (r.ok ? r.text() : '')).then((t) => { pre.textContent = t.slice(0, 700); }).catch(() => {});
+    } else { box.innerHTML = icon(ext === 'pdf' ? 'file' : 'file'); box.classList.add('ico'); box.appendChild(el('span', null, ext ? '.' + ext : '')); }
+    return box;
+  }
   function renderArtifacts() {
-    const box = $('artifactList'); box.innerHTML = '';
+    document.querySelectorAll('#artView button').forEach((b) => b.classList.toggle('active', b.dataset.v === artView));
+    const box = $('artifactList'); box.innerHTML = ''; box.classList.toggle('grid', artView === 'grid');
     const q = fold($('artifactFilter').value.trim());
     const list = S.artifacts.filter((a) => !q || fold(base(a.path) + ' ' + a.title + ' ' + a.path).includes(q)).slice(0, 300);
     if (!list.length) { box.innerHTML = `<div class="empty-page">${icon('file')}<div>${S.artifacts.length ? tr('No match.') : S.artifactsLoaded ? tr('No artifacts yet.') : tr('Loading…')}</div></div>`; return; }
@@ -1313,6 +1331,20 @@
       const h = el('button', 'grp'); h.innerHTML = `${icon(s.kind === 'cowork' ? 'cowork' : s.kind === 'code' ? 'code' : 'chat')}<span class="tt"></span><small></small>`;
       h.querySelector('.tt').textContent = s.title; h.querySelector('small').textContent = `${KIND_LABEL[s.kind] || ''} · ${ago(s.when)} · ${files.length === 1 ? tr('1 file') : tr('{n} files', { n: files.length })}`;
       h.onclick = () => openSession(s); box.appendChild(h);
+      if (artView === 'grid') {
+        const g = el('div', 'agrid');
+        for (const a of files) {
+          const c = el('div', 'acard'); c.title = a.path;
+          c.appendChild(artPreview(a));
+          const t = el('div', 'at'); t.innerHTML = `${icon('file')}<span class="nm"></span><span class="acts"></span>`;
+          t.querySelector('.nm').textContent = base(a.path);
+          const f = el('button', 'ib sm'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = (e) => { e.stopPropagation(); send({ type: 'reveal', path: a.path }); };
+          t.querySelector('.acts').appendChild(f);
+          const m = el('div', 'am', `${tr(a.action)} · ${ago(s.when)}`);
+          c.append(t, m); c.onclick = () => openArtifact(a); g.appendChild(c);
+        }
+        box.appendChild(g); continue;
+      }
       for (const a of files) {
         const r = el('div', 'prow'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
         r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${shortPath(a.path)}`;

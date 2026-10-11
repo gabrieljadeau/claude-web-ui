@@ -225,6 +225,24 @@ body.space-code .welcome .suggest { display: none; }
 .plist .grp { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; border: 0; background: none; padding: 22px 6px 6px; color: var(--ink); font-size: 14px; } .plist .grp:hover .tt { text-decoration: underline; }
 .plist .grp svg { width: 14px; height: 14px; color: var(--muted); align-self: center; flex: none; } .plist .grp .tt { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .plist .grp small { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .plist .grp + .prow { border-top: 1px solid var(--line2); }
+/* Artifacts: Drive-like list/grid switcher and preview cards */
+.view-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-left: 6px; }
+.view-seg button { border: 0; background: var(--panel); padding: 0 12px; height: 34px; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.view-seg button + button { border-left: 1px solid var(--line); } .view-seg button svg { width: 16px; height: 16px; } .view-seg button .chk { display: none; width: 14px; height: 14px; }
+.view-seg button.active { background: var(--accent-soft); color: var(--ink); } .view-seg button.active .chk { display: block; }
+.plist.grid .grp { padding-bottom: 10px; }
+.agrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-bottom: 8px; }
+.acard { background: var(--panel); border: 1px solid var(--line2); border-radius: 12px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
+.acard:hover { border-color: var(--line); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.apv { position: relative; height: 150px; background: var(--soft); overflow: hidden; border-bottom: 1px solid var(--line2); display: grid; place-items: center; }
+.apv.img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.apv.page iframe { position: absolute; top: 0; left: 0; width: 1000px; height: 625px; border: 0; background: #fff; transform: scale(var(--s, .25)); transform-origin: 0 0; pointer-events: none; }
+.apv.txt pre { position: absolute; inset: 0; margin: 0; padding: 10px 12px; font-family: var(--mono); font-size: 7.5px; line-height: 1.4; color: var(--muted); white-space: pre-wrap; word-break: break-word; overflow: hidden; background: var(--panel); mask-image: linear-gradient(#000 70%, transparent); }
+.apv.ico svg { width: 36px; height: 36px; color: var(--muted); } .apv.ico span { position: absolute; bottom: 10px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.acard .at { display: flex; align-items: center; gap: 8px; padding: 10px 8px 2px 12px; } .acard .at > svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.acard .at .nm { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
+.acard .at .acts { opacity: 0; } .acard:hover .at .acts { opacity: 1; }
+.acard .am { color: var(--muted); font-size: 12px; padding: 0 12px 10px; }
 .plist .prow .icon { width: 32px; height: 32px; border-radius: 8px; background: var(--soft); display: grid; place-items: center; } .plist .prow .icon svg { width: 16px; height: 16px; color: var(--muted); }
 .plist .prow .t { flex: 1; min-width: 0; } .plist .prow .t small { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rows .rrow { display: flex; align-items: flex-start; gap: 12px; padding: 12px 6px; border-bottom: 1px solid var(--line2); }
