@@ -54,13 +54,13 @@
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
-      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); if (S.view === 'welcome') { renderWelcomeChips(); renderJump(); } if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
+      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
       case 'routines': S.routines = m.items; if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); break;
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
       case 'authTest': toast(m.ok ? `Connection works. Claude replied: "${m.reply}"` : `Request failed: ${m.message}`, !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); break;
-      case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncBrowserView(); } break;
+      case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? 'Waiting for your approval' : null); } if (m.status === 'idle') flushQueue(m.sid); break;
       case 'ev': if (S.info && m.sid === S.info.sid) renderEvent(m.ev); else if (m.ev.type === 'done' && m.ev.ok === false && m.ev.message) toast(m.ev.message, true); else if (m.ev.type === 'permission') toast('A chat needs your approval. See the sidebar or the Dashboard.', false, 5000); break;
@@ -72,8 +72,15 @@
       case 'plugins': S.plugins = m; renderPlugins(); break;
       case 'dashboard': S.dash = m; if (S.view === 'dashboard') renderDashboard(); break;
       case 'reported': onReported(m); break;
-      case 'browserFrame': if (!isBlankUrl(m.url)) showBrowserFrame('data:image/jpeg;base64,' + m.data, m.title || m.url); break;
+      case 'browserFrame': browserFrame(m); break;
       case 'browserState': browserState(m); break;
+      case 'launchList': onLaunchList(m); break;
+      case 'launchLog': onLaunchLog(m); break;
+      case 'launchLogs': onLaunchLogs(m); break;
+      case 'fsList': onFsList(m); break;
+      case 'fsSearch': onFsSearch(m); break;
+      case 'termOut': onTermOut(m); break;
+      case 'termOpened': onTermOpened(m); break;
       case 'toast': toast(m.text); break;
       case 'error': toast(m.message, true); break;
     }
@@ -91,13 +98,19 @@
     else if (a.connected === true) { cls = 'ok'; text = `Connected · ${prov}`; }
     else if (a.connected === false) { cls = 'bad'; text = 'Not connected'; }
     else { cls = 'warn'; text = 'Connection not verified'; }
-    dot.className = 'dot ' + cls; label.textContent = text;
+    dot.className = 'dot ' + cls; label.textContent = '· ' + (a.connected === true ? prov : text); $('userBtn').title = text;
     $('connStatus').textContent = text + (a.cli ? ` · ${a.cli}` : ''); $('connDetail').textContent = a.detail || '';
     $('connect').hidden = !(S.connected && a.checked && a.connected === false && !S.connectSkipped);
     $('connectDetail').textContent = a.detail || '';
     $('connectText').textContent = a.provider === 'bedrock' ? 'Claude is set up for Amazon Bedrock but the AWS credentials are missing or expired.' : 'This interface uses the same login as the claude terminal command.';
   }
-  $('userBtn').onclick = () => openSettings('connection');
+  $('userBtn').onclick = (e) => menu(e, [
+    ['Settings', () => openSettings('general')],
+    ['Connection…', () => openSettings('connection')],
+    [S.showArchived ? 'Hide archived chats' : 'Show archived chats', () => { S.showArchived = !S.showArchived; store.set('showArchived', S.showArchived); renderList(); }],
+    null,
+    ['Request a fix or a feature', () => openReport()],
+  ], S.user || 'Account');
   $('connectCheck').onclick = $('connCheck').onclick = () => { $('connectDetail').textContent = 'Checking…'; send({ type: 'authCheck' }); };
   $('connectOpen').onclick = $('connLogin').onclick = () => { send({ type: 'authLogin' }); toast('A terminal window with claude should open. Log in there, then press "Check again".', false, 6000); };
   $('connectTest').onclick = $('connTest').onclick = () => { $('connectDetail').textContent = $('connDetail').textContent = 'Sending a tiny request…'; send({ type: 'authTest' }); };
@@ -309,26 +322,31 @@
     renderSessionHead(); renderList(); renderPanel();
     sessionComposer.setBusy(info.status !== 'idle');
     if (info.status !== 'idle') showWorking(info.status === 'waiting' ? 'Waiting for your approval' : null);
-    editing = null; $('editHint').hidden = true; renderQueue(); resetBrowserView(); syncBrowserView();
+    editing = null; $('editHint').hidden = true; renderQueue(); panesOnSession();
     scrollDown(true); sessionComposer.focus();
     if (pendingFirst) { const m = pendingFirst; pendingFirst = null; send({ type: 'send', sid: info.sid, text: m.text, files: m.files }); }
   }
   function renderSessionHead() {
     const i = S.info; if (!i) return;
-    $('sKind').textContent = KIND_LABEL[i.kind]; $('sKind').className = 'kind ' + i.kind;
-    const t = $('sTitle'); if (document.activeElement !== t) t.value = i.title || '';
-    t.style.width = Math.min(80, Math.max(10, (t.value || t.placeholder).length + 3)) + 'ch';
+    $('sKindIcon').innerHTML = `<use href="#i-${i.kind === 'routine' ? 'clock' : i.kind}"/>`; $('sKindIcon').title = KIND_LABEL[i.kind];
+    $('sTitle').textContent = i.title || 'Untitled';
     // The folder as a chip next to the title (full path on hover); nothing for Chat, which has no folder.
     const p = $('sPath'), showPath = i.kind !== 'chat' && !!i.cwd; p.hidden = !showPath;
     if (showPath) { p.querySelector('span').textContent = i.cwd === S.home ? 'Home folder' : (i.cwd.split(/[\\/]/).filter(Boolean).pop() || i.cwd); p.title = shortPath(i.cwd); }
     $('sCost').textContent = i.cost ? `~$${i.cost.toFixed(i.cost < 0.1 ? 3 : 2)} spent` : '';
     renderCtx($('sCtx'), i.context); syncUsage();
-    $('sModelChip').querySelector('span').textContent = modelLabel(i.model);
-    $('sEffortChip').querySelector('span').textContent = EFFORT_LABEL[i.effort || ''];
+    $('sModelChip').querySelector('span').textContent = modelLabel(i.model); $('sEffortText').textContent = effortShort(i.effort || '');
     $('sModeChip').querySelector('span').textContent = MODE_SHORT[i.mode] || i.mode; $('sModeChip').hidden = i.kind === 'chat';
-    $('sBrowserChip').querySelector('span').textContent = i.browser ? 'Browser: on' : 'Browser: off'; $('sBrowserChip').hidden = i.kind === 'chat';
-    $('sPin').classList.toggle('on', !!i.pinned);
-    $('panelBtn').classList.toggle('on', document.body.classList.contains('panel-open'));
+    $('sBrowserChip').querySelector('span').textContent = i.browser ? 'Browser on' : 'Browser off'; $('sBrowserChip').hidden = i.kind === 'chat';
+    syncPaneBtns();
+    renderContext();
+  }
+  function renderContext() {
+    const i = S.info; const box = $('contextBody'); if (!i || !box) return; box.innerHTML = '';
+    const row = (ic, label, title, fn) => { const b = el(fn ? 'button' : 'div', 'out'); b.innerHTML = `${icon(ic)}<span class="nm"></span>`; b.querySelector('.nm').textContent = label; if (title) b.title = title; if (fn) b.onclick = fn; box.appendChild(b); };
+    if (i.kind !== 'chat' && i.cwd) row('folder', i.cwd === S.home ? 'Home folder' : baseName(i.cwd), shortPath(i.cwd), () => send({ type: 'reveal', path: i.cwd }));
+    row(i.kind === 'routine' ? 'clock' : i.kind, KIND_LABEL[i.kind] + (i.kind === 'chat' ? '' : ' · ' + (MODE_SHORT[i.mode] || i.mode)));
+    if (V?.used.size) { const u = el('div', 'used'); for (const x of V.used) u.appendChild(el('span', null, x)); box.appendChild(u); }
   }
   function renderCtx(node, ctx) {
     if (!ctx || !ctx.window) { node.hidden = true; return; }
@@ -337,18 +355,12 @@
     node.querySelector('i').style.width = pct + '%'; node.querySelector('.pct').textContent = `Context ${pct}%`;
     node.title = `Context window: ${fmtK(ctx.used)} of ${fmtK(ctx.window)} tokens used`;
   }
-  function syncUsage() { $('usageSec').hidden = $('sCtx').hidden && !$('sCost').textContent; }
-  $('sTitle').onchange = () => { const t = $('sTitle').value.trim(); if (t && S.info) { S.info.title = t; send({ type: 'rename', sid: S.sid, title: t }); } };
-  $('sTitle').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sTitle').blur(); } };
-  $('sModelChip').onclick = (e) => modelMenu(e, (v) => send({ type: 'sessionSettings', sid: S.sid, model: v }));
-  $('sEffortChip').onclick = (e) => menu(e, Object.entries(EFFORT_LABEL).map(([v, l]) => [l, () => send({ type: 'sessionSettings', sid: S.sid, effort: v })]), 'Thinking effort');
+  function syncUsage() { /* context and cost live in the header */ }
+  // The title is a dropdown like claude.ai: rename, pin, archive, delete.
+  $('sTitleBtn').onclick = (e) => { const i = S.info; if (i) sessionMenu(e, { sid: i.sid, sdkId: i.sdkId, title: i.title, pinned: i.pinned, archived: i.archived }); };
+  $('sModelChip').onclick = (e) => modelMenu(e, S.info?.model || '', S.info?.effort || '', (v) => send({ type: 'sessionSettings', sid: S.sid, model: v }), (v) => send({ type: 'sessionSettings', sid: S.sid, effort: v }));
   $('sModeChip').onclick = (e) => menu(e, Object.entries(MODE_LABEL).map(([v, l]) => [l, () => send({ type: 'sessionSettings', sid: S.sid, mode: v })]), 'Permissions');
   $('sBrowserChip').onclick = () => send({ type: 'sessionSettings', sid: S.sid, browser: !S.info?.browser });
-  $('sPin').onclick = () => { if (!S.info?.sdkId) return toast('Send a message first.'); S.info.pinned = !S.info.pinned; send({ type: 'pin', sid: S.sid, value: S.info.pinned }); renderSessionHead(); };
-  $('sMore').onclick = (e) => { const i = S.info; if (i) sessionMenu(e, { sid: i.sid, sdkId: i.sdkId, title: i.title, pinned: i.pinned, archived: i.archived }); };
-  $('panelBtn').onclick = () => openPanel(!document.body.classList.contains('panel-open'));
-  function openPanel(v) { document.body.classList.toggle('panel-open', v); store.set('panel', v); $('panelBtn').classList.toggle('on', v); if (v) renderPanel(); }
-  if (store.get('panel', true)) document.body.classList.add('panel-open');
   function fillModelSelect(sel, value) {
     sel.innerHTML = ''; const custom = store.get('customModel', '');
     for (const [v, l] of MODELS) { const o = el('option', null, v === '__custom' && custom ? 'Custom: ' + custom : l); o.value = v; sel.appendChild(o); }
@@ -432,7 +444,7 @@
     wrap.append(b, acts); row.appendChild(wrap); turn.appendChild(row);
     const reply = el('div', 'reply'); turn.appendChild(reply);
     log.appendChild(turn); V.turn = turn; V.reply = reply; V.group = null; V.think = null; V.live = null; V.started = Date.now();
-    if (!$('sTitle').value && document.activeElement !== $('sTitle')) $('sTitle').value = text.split('\n')[0].slice(0, 80);
+    if (S.info && !S.info.title) { S.info.title = text.split('\n')[0].slice(0, 80); $('sTitle').textContent = S.info.title; }
     keepWorkingLast(); scrollDown(true);
   }
   function addProse(text, live) {
@@ -521,7 +533,7 @@
     if (parentRow && parentRow.parentElement === g.list) { let after = parentRow; while (after.nextElementSibling?.classList.contains('sub')) after = after.nextElementSibling; after.after(row); } else g.list.appendChild(row);
     g.items.push(s); s.row = row; refreshGroup(g);
     if (!replay) showWorking(s.parent ? (V.steps.get(s.parent)?.label || 'Helper agent') + ' › ' + d.label : d.label);
-    if (!replay && d.kind === 'browser' && !browserWatching) setBrowserView(true);
+    if (!replay && d.kind === 'browser') paneAutoOpen('browser');
     updatePlan(m.name, m.input, null);
     if (d.file) V.files.set(d.file, { action: V.files.get(d.file)?.action === 'Created' ? 'Created' : d.action });
     addActRow(s); renderPanelLight(); scrollDown();
@@ -545,7 +557,7 @@
     if (V.group) refreshGroup(V.group);
     updatePlan(s.name, s.input, m.content);
     updateActRow(s);
-    if (s.file && previewPath === s.file && !$('preview').hidden) openPreview(s.file);
+    if (s.file && F.active === s.file && paneState.files) openFile(s.file);
     if (!replay && !s.parent) showWorking('Thinking');
     renderPanelLight();
   }
@@ -649,8 +661,7 @@
     if (!files.length) out.appendChild(el('div', 'empty-note', 'Files Claude creates or changes appear here.'));
     for (const [p, f] of files) { const b = el('button', 'out'); b.title = p; b.innerHTML = `${icon('file')}<span class="nm"></span><span class="tag"></span>`; b.querySelector('.nm').textContent = base(p); b.querySelector('.tag').textContent = f.action || ''; b.onclick = () => openPreview(p); out.appendChild(b); }
     $('stepCount').textContent = V.stepCount || '';
-    const used = $('used'); used.innerHTML = ''; if (!V.used.size) used.appendChild(el('span', null, 'Nothing yet'));
-    for (const u of V.used) used.appendChild(el('span', null, u));
+    renderContext();
   }
   function addActRow(s) {
     const acts = $('acts'); const empty = acts.querySelector('.empty-note'); if (empty) empty.remove();
@@ -672,58 +683,317 @@
     if (s.images?.length && !row.querySelector(':scope > .detail > img')) for (const p of s.images) { const im = el('img'); im.src = fileUrl(p); im.onclick = () => openPreview(p); row.querySelector('.detail').appendChild(im); }
   }
 
-  // browser view (live screencast of the browser Claude drives, or its latest screenshot).
-  // Shown by default in Cowork and Code sessions that have the browser on ("lazy": the browser itself is
-  // only launched when Claude first uses it); the globe button hides it again for this session.
-  let browserWatching = false, browserFrameSrc = '', browserHidden = false;
-  const isBlankUrl = (u) => !u || /^about:blank/.test(u);
-  function resetBrowserView() { if (browserWatching) send({ type: 'browserWatch', on: false }); browserWatching = false; browserHidden = false; $('browserSec').hidden = true; $('browserBtn').classList.remove('on'); clearBrowserFrame(); $('browserNote').textContent = 'Opening the browser…'; }
-  function clearBrowserFrame() { $('browserView').classList.remove('has'); $('browserImg').src = ''; browserFrameSrc = ''; $('browserTitle').textContent = ''; }
-  function syncBrowserView() {
-    const i = S.info; if (!i) return;
-    const want = !!i.browser && i.kind !== 'chat' && !browserHidden;
-    if (want && !browserWatching) setBrowserView(true, { lazy: true });
-    else if (!i.browser && browserWatching) setBrowserView(false);
-  }
-  function browserState(m) {
-    const blank = !m.page || isBlankUrl(m.page.url);
-    if (m.frame && !blank) showBrowserFrame('data:image/jpeg;base64,' + m.frame, m.page?.title); // the last frame stays up while no page is open
-    $('browserNote').textContent = m.live ? (blank ? 'Claude has not opened a page yet. It appears here as soon as it does.' : '') : m.lazy ? 'The browser opens here as soon as Claude uses it.' : 'Could not open a browser with a live view. Screenshots Claude takes will still appear here.';
-    if (!blank) $('browserTitle').textContent = m.page.title || m.page.url || '';
-  }
-  function setBrowserView(on, { lazy = false, user = false } = {}) {
-    browserWatching = on; $('browserSec').hidden = !on; $('browserBtn').classList.toggle('on', on);
-    if (user) browserHidden = !on;
-    document.body.classList.toggle('panel-wide', on);
-    if (on) { if (!lazy) openPanel(true); send({ type: 'browserWatch', on: true, lazy }); } else send({ type: 'browserWatch', on: false });
-  }
-  function showBrowserFrame(src, title, isShot) {
-    browserFrameSrc = src; const img = $('browserImg'); img.src = src; $('browserView').classList.add('has');
-    if (title) $('browserTitle').textContent = title;
-    if (isShot && !browserWatching) { $('browserSec').hidden = false; openPanel(true); }
-  }
-  $('browserBtn').onclick = () => setBrowserView(!browserWatching, { user: true });
-  $('browserClose').onclick = () => setBrowserView(false, { user: true });
-  $('browserView').onclick = () => { if (!browserFrameSrc) return; const body = $('previewBody'); body.innerHTML = ''; const im = el('img'); im.src = browserFrameSrc; body.appendChild(im); $('previewName').textContent = $('browserTitle').textContent || 'Browser'; $('previewOpen').href = browserFrameSrc; previewPath = null; $('preview').hidden = false; };
-
-  // file preview
-  let previewPath = null;
-  const fileUrl = (p, raw) => `/file?t=${encodeURIComponent(token || '')}&path=${encodeURIComponent(p)}${raw ? '&raw=1' : ''}`;
-  async function openPreview(p) {
-    previewPath = p; $('previewName').textContent = base(p); $('previewOpen').href = fileUrl(p);
-    const body = $('previewBody'); body.innerHTML = ''; const ext = (base(p).split('.').pop() || '').toLowerCase();
-    $('preview').hidden = false;
-    if (['html', 'htm', 'pdf', 'svg'].includes(ext)) { const f = el('iframe'); f.src = fileUrl(p); f.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups'); body.appendChild(f); }
-    else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) { const img = el('img'); img.src = fileUrl(p) + '&v=' + Date.now(); body.appendChild(img); }
-    else if (['mp4', 'webm'].includes(ext)) { const v = el('video'); v.src = fileUrl(p); v.controls = true; body.appendChild(v); }
-    else if (['docx', 'xlsx', 'pptx', 'zip', 'exe'].includes(ext)) body.innerHTML = '<div class="prose"><p>This file type can\'t be previewed here. Use "Show in folder" to open it.</p></div>';
-    else {
-      try { const r = await fetch(fileUrl(p, true)); const t = await r.text(); if (!r.ok) throw new Error(t); if (ext === 'md' || ext === 'markdown') { const d = el('div', 'prose'); renderInto(d, t, true); body.appendChild(d); } else body.appendChild(el('pre', null, t)); }
-      catch { body.innerHTML = '<div class="prose"><p>This file isn\'t available yet.</p></div>'; }
+  // ------------------------------------------------------------- panes: Browser, Files, Terminal, Progress
+  // Stacked on the right of the chat; each can be closed, put full screen and resized (drag the handles between
+  // them, or the left edge of the column). Which ones are open is remembered per browser.
+  const PANES = ['browser', 'files', 'term', 'progress'];
+  const PANE_EL = { browser: 'paneBrowser', files: 'paneFiles', term: 'paneTerm', progress: 'paneProgress' };
+  const PANE_BTN = { browser: 'browserBtn', files: 'filesBtn', term: 'termBtn', progress: 'panelBtn' };
+  const paneState = Object.assign({ browser: false, files: false, term: false, progress: true }, store.get('panes', {}));
+  let fullPane = null;
+  function layoutPanes() {
+    document.body.classList.toggle('panel-open', PANES.some((n) => paneState[n]));
+    store.set('panes', paneState);
+    for (const n of PANES) { $(PANE_EL[n]).hidden = !paneState[n]; $(PANE_BTN[n]).classList.toggle('on', paneState[n]); }
+    let before = false;
+    for (const c of $('panel').children) {
+      if (c.classList.contains('pane')) { before = before || !c.hidden; continue; }
+      if (c.classList.contains('pane-gap')) { const next = c.nextElementSibling; c.hidden = !(before && next && !next.hidden); }
     }
   }
-  $('previewClose').onclick = () => { $('preview').hidden = true; previewPath = null; };
-  $('previewReveal').onclick = () => previewPath && send({ type: 'reveal', path: previewPath });
+  function togglePane(n, v) {
+    v = v == null ? !paneState[n] : !!v; if (paneState[n] === v) return;
+    paneState[n] = v; if (!v && fullPane === n) setFull(n, false);
+    layoutPanes(); if (v) paneShown(n); else paneHidden(n);
+  }
+  function openPanel(v, user) { togglePane('progress', v); if (user && S.info) store.set('panel.' + S.info.kind, !!v); }
+  function panelDefault(kind) { return store.get('panel.' + kind, kind !== 'chat'); }
+  function setFull(n, v) {
+    const p = $(PANE_EL[n]); v = v == null ? !p.classList.contains('full') : v;
+    for (const m of PANES) $(PANE_EL[m]).classList.remove('full');
+    if (v) p.classList.add('full'); fullPane = v ? n : null;
+    p.querySelector('.pane-full use').setAttribute('href', v ? '#i-shrink' : '#i-expand'); p.querySelector('.pane-full').title = v ? 'Exit full screen' : 'Full screen';
+  }
+  for (const n of PANES) {
+    const p = $(PANE_EL[n]);
+    p.querySelector('.pane-close').onclick = () => togglePane(n, false);
+    p.querySelector('.pane-full').onclick = () => setFull(n);
+    $(PANE_BTN[n]).onclick = () => (n === 'progress' ? openPanel(!paneState.progress, true) : togglePane(n));
+  }
+  // resize: the column width (left edge) and the pane heights (handles between panes)
+  const PANEL_MIN = 300;
+  const setPanelW = (w) => document.documentElement.style.setProperty('--panel-w', Math.max(PANEL_MIN, Math.min(window.innerWidth * 0.75, w)) + 'px');
+  { const saved = store.get('panelW', 0); if (saved) setPanelW(saved); }
+  $('panelResize').onpointerdown = (e) => {
+    e.preventDefault(); const x0 = e.clientX, w0 = $('panel').getBoundingClientRect().width; document.body.classList.add('resizing');
+    const move = (ev) => setPanelW(w0 - (ev.clientX - x0));
+    const up = (ev) => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.body.classList.remove('resizing'); store.set('panelW', Math.round(Math.max(PANEL_MIN, w0 - (ev.clientX - x0)))); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+  };
+  for (const gap of document.querySelectorAll('#panel .pane-gap')) gap.onpointerdown = (e) => {
+    e.preventDefault();
+    let above = gap.previousElementSibling; while (above && (above.hidden || !above.classList.contains('pane'))) above = above.previousElementSibling;
+    let below = gap.nextElementSibling; while (below && (below.hidden || !below.classList.contains('pane'))) below = below.nextElementSibling;
+    if (!above || !below) return;
+    const y0 = e.clientY, hA = above.getBoundingClientRect().height, hB = below.getBoundingClientRect().height, total = hA + hB;
+    const unit = total / ((parseFloat(above.style.flexGrow) || 1) + (parseFloat(below.style.flexGrow) || 1));
+    document.body.classList.add('resizing-y'); gap.classList.add('active');
+    const move = (ev) => { const a = Math.max(110, Math.min(total - 110, hA + ev.clientY - y0)); above.style.flexGrow = a / unit; below.style.flexGrow = (total - a) / unit; };
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.body.classList.remove('resizing-y'); gap.classList.remove('active'); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+  };
+  function paneShown(n) {
+    if (n === 'browser') { send({ type: 'browserWatch', on: true, lazy: true }); requestLaunchList(); }
+    if (n === 'files') filesInit();
+    if (n === 'term') termInit();
+    if (n === 'progress') renderPanel();
+  }
+  function paneHidden(n) { if (n === 'browser') send({ type: 'browserWatch', on: false }); }
+  function paneAutoOpen(n) { if (!paneState[n] && !paneUserClosed[n]) togglePane(n, true); }
+  const paneUserClosed = {};
+  for (const n of PANES) $(PANE_EL[n]).querySelector('.pane-close').addEventListener('click', () => { paneUserClosed[n] = true; });
+  function syncPaneBtns() { for (const n of PANES) $(PANE_BTN[n]).classList.toggle('on', paneState[n]); }
+  // a new session was opened in the view: reset per-session content
+  function panesOnSession() {
+    for (const n of PANES) paneUserClosed[n] = false;
+    paneState.progress = panelDefault(S.info?.kind || 'code');
+    clearBrowserFrame(); B.tabs = []; B.page = null; renderTabs(); $('bUrl').value = ''; L.items = []; renderLaunch(); $('bLogs').hidden = true;
+    filesReset(); termReset();
+    layoutPanes();
+    if (paneState.browser) { send({ type: 'browserWatch', on: true, lazy: true }); requestLaunchList(); }
+    if (paneState.files) filesInit();
+    if (paneState.term) termInit();
+  }
+  function syncPanes() { /* session settings changed (browser on/off): nothing to force */ }
+
+  // ---- Browser pane: Chrome's tabs and pages, streamed from the server; clicks, keys and the address bar go back to it
+  const B = { tabs: [], active: null, page: null, live: false, following: true, w: 0, h: 0, src: '', shot: false, interact: true, lastFrameAt: 0 };
+  const isBlankUrl = (u) => !u || /^about:blank/.test(u);
+  function clearBrowserFrame() { $('bBody').classList.remove('has'); $('browserImg').src = ''; B.src = ''; B.shot = false; }
+  function browserState(m) {
+    B.live = !!m.live; B.tabs = m.tabs || []; B.active = m.active || null; B.page = m.page || null; B.following = m.following !== false;
+    const blank = !B.page || isBlankUrl(B.page.url);
+    if (m.frame && !blank) showBrowserFrame('data:image/jpeg;base64,' + m.frame, B.page?.title);
+    else if (blank && !B.shot) clearBrowserFrame();
+    renderTabs(); renderUrl(); renderHint();
+    $('bFollow').classList.toggle('on', B.following); $('bFollow').hidden = !B.live;
+    for (const id of ['bBack', 'bFwd', 'bReload']) $(id).disabled = !B.live || blank;
+  }
+  function browserFrame(m) {
+    if (isBlankUrl(m.url)) { if (!B.shot) clearBrowserFrame(); return; }
+    B.w = m.w || B.w; B.h = m.h || B.h; B.lastFrameAt = Date.now(); B.shot = false;
+    showBrowserFrame('data:image/jpeg;base64,' + m.data, m.title || m.url);
+  }
+  function showBrowserFrame(src, title, isShot) {
+    if (isShot) { if (Date.now() - B.lastFrameAt < 5000) return; paneAutoOpen('browser'); B.shot = true; }
+    B.src = src; $('browserImg').src = src; $('bBody').classList.add('has');
+  }
+  function renderTabs() {
+    const box = $('btabs'); box.innerHTML = '';
+    for (const t of B.tabs) {
+      const b = el('button', 'btab' + (t.id === B.active ? ' active' : '')); b.title = t.url || '';
+      const nm = el('span', 'nm', isBlankUrl(t.url) ? 'New tab' : (t.title || hostOf(t.url)));
+      if (/^https?:/.test(t.favicon || '')) { const im = el('img'); im.src = t.favicon; im.alt = ''; im.onerror = () => im.remove(); b.appendChild(im); }
+      const x = el('span', 'x'); x.innerHTML = icon('close'); x.title = 'Close tab'; x.onclick = (e) => { e.stopPropagation(); send({ type: 'browserAction', action: 'closeTab', id: t.id }); };
+      b.append(nm, x); b.onclick = () => send({ type: 'browserAction', action: 'selectTab', id: t.id });
+      box.appendChild(b);
+    }
+    if (!B.tabs.length) box.appendChild(el('span', 'btab active', 'New tab'));
+  }
+  const hostOf = (u) => { try { return new URL(u).host || u; } catch { return u || ''; } };
+  function renderUrl() { const inp = $('bUrl'); if (document.activeElement === inp) return; inp.value = B.page && !isBlankUrl(B.page.url) ? B.page.url : ''; }
+  function renderHint() {
+    const h = $('bHint');
+    if (!B.live) h.innerHTML = 'Enter a URL or run a server: the browser opens here.<br>Claude uses this same browser when it browses the web.';
+    else if (L.items.length) h.innerHTML = 'Run a server to preview your app, or enter a URL.<br>Edit this list in <code>.claude/launch.json</code>.';
+    else h.innerHTML = 'Enter a URL above, or add dev servers to <code>.claude/launch.json</code> to start them from here.';
+  }
+  $('bUrl').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); const u = $('bUrl').value.trim(); if (u) { send({ type: 'browserAction', action: 'navigate', url: u }); $('bUrl').blur(); $('bBody').focus(); } } if (e.key === 'Escape') { renderUrl(); $('bUrl').blur(); } };
+  $('bUrl').onfocus = () => $('bUrl').select();
+  $('bBack').onclick = () => send({ type: 'browserAction', action: 'back' });
+  $('bFwd').onclick = () => send({ type: 'browserAction', action: 'forward' });
+  $('bReload').onclick = () => send({ type: 'browserAction', action: 'reload' });
+  $('btabNew').onclick = () => { send({ type: 'browserAction', action: 'newTab' }); setTimeout(() => $('bUrl').focus(), 300); };
+  $('bFollow').onclick = () => send({ type: 'browserAction', action: 'follow' });
+  $('bPointer').onclick = () => { B.interact = !B.interact; $('bPointer').classList.toggle('on', B.interact); $('bBody').classList.toggle('interact', B.interact); };
+  $('bBody').classList.add('interact');
+  $('paneBrowser').querySelector('.pane-more').onclick = (e) => {
+    const url = B.page?.url; const entries = [];
+    if (url && !isBlankUrl(url)) entries.push(['Open in your own browser', () => send({ type: 'openUrl', url })], ['Copy address', () => copyText(url)]);
+    entries.push(['Save a screenshot', () => { if (!B.src) return toast('No page to capture.'); const a = document.createElement('a'); a.href = B.src; a.download = 'screenshot.jpg'; a.click(); }]);
+    for (const it of L.items) if (it.status === 'running' || it.status === 'starting') entries.push([`Logs of ${it.name}`, () => showLogs(it.name)], [`Stop ${it.name}`, () => send({ type: 'launchStop', sid: S.sid, name: it.name })]);
+    menu(e, entries, 'Browser');
+  };
+  // input relay: coordinates in CSS pixels of the streamed page
+  const pos = (e) => { const r = $('browserImg').getBoundingClientRect(); return { x: Math.round((e.clientX - r.left) / r.width * (B.w || r.width)), y: Math.round((e.clientY - r.top) / r.height * (B.h || r.height)) }; };
+  const mods = (e) => ({ alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey, shift: e.shiftKey });
+  const canInteract = () => B.interact && B.live && $('bBody').classList.contains('has') && !B.shot;
+  let lastMove = 0;
+  const img = $('browserImg');
+  img.addEventListener('pointerdown', (e) => { if (!canInteract()) return; e.preventDefault(); $('bBody').focus(); send({ type: 'browserInput', kind: 'mouse', event: 'mousePressed', ...pos(e), button: e.button, buttons: e.buttons, clicks: e.detail || 1, ...mods(e) }); });
+  img.addEventListener('pointerup', (e) => { if (!canInteract()) return; e.preventDefault(); send({ type: 'browserInput', kind: 'mouse', event: 'mouseReleased', ...pos(e), button: e.button, buttons: e.buttons, clicks: e.detail || 1, ...mods(e) }); });
+  img.addEventListener('pointermove', (e) => { if (!canInteract()) return; const now = Date.now(); if (now - lastMove < 40 && !e.buttons) return; lastMove = now; send({ type: 'browserInput', kind: 'mouse', event: 'mouseMoved', ...pos(e), button: e.buttons & 1 ? 0 : e.buttons & 2 ? 2 : -1, buttons: e.buttons, ...mods(e) }); });
+  img.addEventListener('contextmenu', (e) => { if (canInteract()) e.preventDefault(); });
+  img.addEventListener('wheel', (e) => { if (!canInteract()) return; e.preventDefault(); send({ type: 'browserInput', kind: 'wheel', ...pos(e), dx: Math.round(e.deltaX), dy: Math.round(e.deltaY), ...mods(e) }); }, { passive: false });
+  const KEEP = new Set(['r', 'l', 'w', 't', 'n', 'q', 'k', '.', 'Tab']); // app shortcuts that stay with this window
+  $('bBody').addEventListener('keydown', (e) => {
+    if (!canInteract()) return; if ((e.metaKey || e.ctrlKey) && KEEP.has(e.key)) return;
+    e.preventDefault(); send({ type: 'browserInput', kind: 'key', event: 'keydown', key: e.key, code: e.code, keyCode: e.keyCode, repeat: e.repeat, ...mods(e) });
+  });
+  $('bBody').addEventListener('keyup', (e) => { if (!canInteract()) return; if ((e.metaKey || e.ctrlKey) && KEEP.has(e.key)) return; e.preventDefault(); send({ type: 'browserInput', kind: 'key', event: 'keyup', key: e.key, code: e.code, keyCode: e.keyCode, ...mods(e) }); });
+  $('bBody').addEventListener('paste', (e) => { if (!canInteract()) return; const t = e.clipboardData?.getData('text'); if (t) { e.preventDefault(); send({ type: 'browserInput', kind: 'text', text: t }); } });
+  // dev servers from .claude/launch.json
+  const L = { items: [], cwd: '' };
+  function requestLaunchList() { if (S.sid && S.info?.kind !== 'chat') send({ type: 'launchList', sid: S.sid }); }
+  function onLaunchList(m) { if (m.cwd !== S.info?.cwd) return; L.items = m.items || []; L.cwd = m.cwd; renderLaunch(); renderHint(); }
+  function renderLaunch() {
+    const box = $('launchList'); box.innerHTML = '';
+    for (const it of L.items) {
+      const row = el('div', 'launch-row ' + (it.status || 'stopped')); row.innerHTML = `${icon('server')}<span class="nm"></span><span class="port"></span><button class="lb"></button>`;
+      row.querySelector('.nm').textContent = it.name; row.title = it.command || it.url || '';
+      row.querySelector('.port').textContent = it.status === 'running' && it.livePort ? ':' + it.livePort : it.port ? ':' + it.port : (it.url ? hostOf(it.url) : '');
+      const b = row.querySelector('.lb');
+      if (it.status === 'starting') { b.innerHTML = '<span class="spin"></span>'; b.title = 'Starting… (click to stop)'; }
+      else if (it.status === 'running') { b.innerHTML = icon('square'); b.title = 'Stop'; }
+      else { b.innerHTML = icon('play'); b.title = 'Run and open in the browser'; }
+      b.onclick = (e) => { e.stopPropagation(); if (it.status === 'running' || it.status === 'starting') send({ type: 'launchStop', sid: S.sid, name: it.name }); else { send({ type: 'launchStart', sid: S.sid, name: it.name }); send({ type: 'browserWatch', on: true }); } };
+      row.onclick = () => { if (it.status === 'running' && it.liveUrl) send({ type: 'browserAction', action: 'navigate', url: it.liveUrl }); else if (it.status !== 'stopped') showLogs(it.name); };
+      box.appendChild(row);
+    }
+  }
+  function showLogs(name) { $('bLogs').hidden = false; $('bLogsName').textContent = name; $('bLogsPre').textContent = ''; $('bLogs').dataset.name = name; send({ type: 'launchLogs', sid: S.sid, name }); }
+  function onLaunchLogs(m) { if ($('bLogs').dataset.name !== m.name) return; const pre = $('bLogsPre'); pre.textContent = (m.lines || []).join('\n'); pre.scrollTop = pre.scrollHeight; }
+  function onLaunchLog(m) { if ($('bLogs').hidden || $('bLogs').dataset.name !== m.name || m.cwd !== S.info?.cwd) return; const pre = $('bLogsPre'); pre.textContent += (pre.textContent ? '\n' : '') + m.line; pre.scrollTop = pre.scrollHeight; }
+  $('bLogsClose').onclick = () => { $('bLogs').hidden = true; };
+
+  // ---- Files pane: the session folder as a tree, and a viewer with tabs
+  const F = { root: '', nodes: new Map(), tabs: [], active: null, q: '', ref: 0 };
+  function filesReset() { F.root = ''; F.nodes.clear(); F.tabs = []; F.active = null; F.q = ''; $('fFilter').value = ''; $('ftree').innerHTML = ''; $('ftabs').innerHTML = ''; showEmptyFile(); }
+  function filesInit() {
+    const cwd = S.info?.cwd; if (!cwd || S.info.kind === 'chat') { $('ftree').innerHTML = '<div class="fnote">This chat has no folder.</div>'; return; }
+    if (F.root === cwd && F.nodes.size) return;
+    F.root = cwd; F.nodes.clear(); $('ftree').innerHTML = ''; loadDir(cwd, $('ftree'));
+  }
+  function loadDir(p, into) { const ref = ++F.ref; F.nodes.set(p, { into, ref }); send({ type: 'fsList', ref, path: p }); }
+  function onFsList(m) {
+    const n = [...F.nodes.values()].find((x) => x.ref === m.ref); if (!n) return;
+    n.into.innerHTML = ''; n.loaded = true; n.items = m.items;
+    if (!m.items.length) n.into.appendChild(el('div', 'fnote', 'Empty folder'));
+    for (const it of m.items) n.into.appendChild(fileNode(it));
+  }
+  function fileNode(it, meta) {
+    const row = el('div', 'fnode' + (it.dir ? ' dir' : '')); row.title = it.path;
+    row.innerHTML = (it.dir ? `<svg class="arr"><use href="#i-chev" style="transform:rotate(-90deg);transform-origin:center"/></svg>` : '<span class="arr"></span>') + `<svg class="fi"><use href="#i-${it.dir ? 'folder' : fileIcon(it.name)}"/></svg><span class="nm"></span>`;
+    row.querySelector('.nm').textContent = it.name; if (meta) row.appendChild(el('span', 'meta', meta));
+    if (it.dir) {
+      const kids = el('div', 'fkids'); kids.hidden = true; const wrap = el('div'); wrap.append(row, kids);
+      row.onclick = () => { const open = row.classList.toggle('open'); kids.hidden = !open; if (open && !F.nodes.get(it.path)?.loaded) loadDir(it.path, kids); };
+      return wrap;
+    }
+    row.onclick = () => openFile(it.path, it.line); if (it.path === F.active) row.classList.add('active');
+    return row;
+  }
+  function fileIcon(name) { const e = (name.split('.').pop() || '').toLowerCase(); if (['js', 'mjs', 'ts', 'tsx', 'jsx', 'json', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'css', 'html', 'sh', 'yml', 'yaml', 'toml'].includes(e)) return 'code'; if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(e)) return 'dash'; if (['md', 'txt'].includes(e)) return 'skill'; return 'file'; }
+  let fFilterTimer = null;
+  $('fFilter').oninput = () => { clearTimeout(fFilterTimer); fFilterTimer = setTimeout(runFilter, 250); };
+  $('fFilter').onkeydown = (e) => { if (e.key === 'Escape') { $('fFilter').value = ''; runFilter(); $('fFilter').blur(); } };
+  function runFilter() {
+    const q = $('fFilter').value.trim(); F.q = q;
+    if (!q || q === '?') { if (F.nodes.get(F.root)?.into !== $('ftree') || !F.nodes.get(F.root)?.loaded) { F.nodes.clear(); $('ftree').innerHTML = ''; if (F.root) loadDir(F.root, $('ftree')); } else { $('ftree').innerHTML = ''; for (const it of F.nodes.get(F.root).items) $('ftree').appendChild(fileNode(it)); for (const [p, n] of F.nodes) if (p !== F.root) F.nodes.delete(p); } return; }
+    const content = q.startsWith('?'); const ref = ++F.ref; F.searchRef = ref;
+    $('ftree').innerHTML = '<div class="fnote">Searching…</div>';
+    send({ type: 'fsSearch', ref, root: F.root, q: content ? q.slice(1).trim() : q, content });
+  }
+  function onFsSearch(m) {
+    if (m.ref !== F.searchRef) return; const box = $('ftree'); box.innerHTML = '';
+    if (!m.items.length) { box.appendChild(el('div', 'fnote', 'No match.')); return; }
+    for (const it of m.items) { const dir = it.rel.includes('/') || it.rel.includes('\\') ? it.rel.slice(0, Math.max(it.rel.lastIndexOf('/'), it.rel.lastIndexOf('\\'))) : ''; box.appendChild(fileNode({ name: it.line ? `${it.name}:${it.line}  ${it.text || ''}` : it.name, path: it.path, line: it.line }, dir)); }
+    if (m.items.length >= 100) box.appendChild(el('div', 'fnote', 'Only the first 100 matches are shown.'));
+  }
+  $('fSearchBtn').onclick = () => { const f = $('fFilter'); if (!f.value.startsWith('?')) f.value = '?' + f.value; f.focus(); };
+  $('paneFiles').querySelector('.pane-more').onclick = (e) => menu(e, [
+    ['Refresh', () => { F.nodes.clear(); $('ftree').innerHTML = ''; if (F.root) loadDir(F.root, $('ftree')); }],
+    ['Show folder in ' + (navigator.platform.startsWith('Mac') ? 'Finder' : 'Explorer'), () => F.root && send({ type: 'reveal', path: F.root })],
+    ['Close all files', () => { F.tabs = []; F.active = null; renderFileTabs(); showEmptyFile(); }],
+  ], 'Files');
+  function showEmptyFile() { $('fcontent').innerHTML = `<div class="fempty">${icon('folder')}<b>Open files appear here</b><span>Pick a file in the tree, or click a file path in the conversation.</span></div>`; }
+  function renderFileTabs() {
+    const box = $('ftabs'); box.innerHTML = '';
+    for (const t of F.tabs) {
+      const b = el('button', 'ftab' + (t.path === F.active ? ' active' : '')); b.title = t.path; b.innerHTML = '<span class="nm"></span><span class="x">' + icon('close') + '</span>';
+      b.querySelector('.nm').textContent = t.name; b.onclick = () => openFile(t.path, null, t.src);
+      b.querySelector('.x').onclick = (e) => { e.stopPropagation(); F.tabs = F.tabs.filter((x) => x !== t); if (F.active === t.path) { F.active = null; const last = F.tabs[F.tabs.length - 1]; if (last) openFile(last.path, null, last.src); else { renderFileTabs(); showEmptyFile(); } } else renderFileTabs(); };
+      box.appendChild(b);
+    }
+    for (const n of document.querySelectorAll('#ftree .fnode')) n.classList.toggle('active', n.title === F.active);
+  }
+  async function openFile(p, line, src) {
+    togglePane('files', true);
+    if (!F.tabs.some((t) => t.path === p)) F.tabs.push({ path: p, name: src ? (p.split(/[\\/]/).pop() || 'Image') : base(p), src });
+    F.active = p; renderFileTabs();
+    const body = $('fcontent'); body.innerHTML = '';
+    const head = el('div', 'fpath'); head.innerHTML = '<span class="nm"></span>'; head.querySelector('.nm').textContent = src ? p : shortPath(p); body.appendChild(head);
+    if (!src) { const rv = el('button', 'btn', 'Show in folder'); rv.onclick = () => send({ type: 'reveal', path: p }); const op = el('a', 'btn', 'Open in new tab'); op.href = fileUrl(p); op.target = '_blank'; op.rel = 'noopener'; head.append(rv, op); }
+    const ext = src ? 'png' : (base(p).split('.').pop() || '').toLowerCase();
+    if (src) { const im = el('img'); im.src = src; body.appendChild(im); return; }
+    if (['html', 'htm', 'pdf'].includes(ext)) { const f = el('iframe'); f.src = fileUrl(p); f.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups'); body.appendChild(f); }
+    else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext)) { const im = el('img'); im.src = fileUrl(p) + '&v=' + Date.now(); body.appendChild(im); }
+    else if (['mp4', 'webm', 'mov'].includes(ext)) { const v = el('video'); v.src = fileUrl(p); v.controls = true; body.appendChild(v); }
+    else if (['docx', 'xlsx', 'pptx', 'zip', 'exe', 'dmg', 'pkg'].includes(ext)) body.appendChild(el('div', 'fnote', 'This file type can\'t be previewed here. Use "Show in folder" to open it.'));
+    else {
+      try {
+        const r = await fetch(fileUrl(p, true)); const t = await r.text(); if (!r.ok) throw new Error(t);
+        if (F.active !== p) return;
+        if (ext === 'md' || ext === 'markdown') { const d = el('div', 'prose'); renderInto(d, t, true); body.appendChild(d); }
+        else { const pre = el('pre', 'src'); const lines = t.split('\n'); if (lines.length > 20000) lines.length = 20000; for (let i = 0; i < lines.length; i++) { const s = el('span', 'ln' + (line && i + 1 === line ? ' hit' : ''), lines[i] + '\n'); pre.appendChild(s); } body.appendChild(pre); if (line) pre.querySelector('.hit')?.scrollIntoView({ block: 'center' }); }
+      } catch { body.appendChild(el('div', 'fnote', 'This file isn\'t available yet.')); }
+    }
+  }
+  function openPreview(p) { openFile(p); }
+  function openImageSrc(src, name) { openFile(name || 'image', null, src); }
+  $('fSplit').onpointerdown = (e) => {
+    e.preventDefault(); const x0 = e.clientX, w0 = $('paneFiles').querySelector('.ftree').getBoundingClientRect().width; document.body.classList.add('resizing');
+    const move = (ev) => document.documentElement.style.setProperty('--ftree-w', Math.max(140, w0 + ev.clientX - x0) + 'px');
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.body.classList.remove('resizing'); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+  };
+
+  // ---- Terminal pane: a shell in the session folder (plain pipes: commands run one after the other)
+  const T = { sid: null, hist: [], hi: 0, buf: '' };
+  function termReset() { T.sid = null; T.hist = []; T.hi = 0; T.buf = ''; $('termOut').textContent = ''; $('termCwd').textContent = ''; }
+  function termInit() { if (!S.sid || S.info?.kind === 'chat') { $('termOut').textContent = 'This chat has no folder to open a shell in.'; return; } if (T.sid !== S.sid) { T.sid = S.sid; $('termOut').textContent = ''; $('termCwd').textContent = shortPath(S.info.cwd); send({ type: 'termOpen', sid: S.sid }); } setTimeout(() => $('termIn').focus(), 50); }
+  function onTermOpened(m) { if (m.sid !== S.sid) return; $('termCwd').textContent = shortPath(m.cwd); if (m.restarted) termWrite('\n[shell restarted]\n'); }
+  function onTermOut(m) {
+    if (m.sid !== S.sid) return;
+    let data = T.buf + m.data; T.buf = '';
+    data = data.replace(/\u001e([^\u001e]*)\u001e\r?\n?/g, (_, cwd) => { if (cwd) $('termCwd').textContent = shortPath(cwd.trim()); return ''; });
+    const i = data.lastIndexOf('\u001e'); if (i >= 0 && data.length - i < 2048) { T.buf = data.slice(i); data = data.slice(0, i); }
+    data = data.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, '');
+    if (data) termWrite(data);
+  }
+  function termWrite(text) { const pre = $('termOut'); const stick = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40; pre.appendChild(document.createTextNode(text)); if (pre.childNodes.length > 4000) pre.removeChild(pre.firstChild); if (stick) pre.scrollTop = pre.scrollHeight; }
+  $('termIn').onkeydown = (e) => {
+    const inp = $('termIn');
+    if (e.key === 'Enter') {
+      e.preventDefault(); const cmd = inp.value; inp.value = ''; if (!cmd.trim()) return;
+      T.hist.push(cmd); T.hi = T.hist.length;
+      if (cmd.trim() === 'clear' || cmd.trim() === 'cls') { $('termOut').textContent = ''; return; }
+      const c = el('span', 'cmd', cmd); $('termOut').appendChild(c); termWrite('\n'); send({ type: 'termRun', sid: S.sid, cmd });
+    } else if (e.key === 'ArrowUp') { e.preventDefault(); if (T.hi > 0) { T.hi--; inp.value = T.hist[T.hi] || ''; } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (T.hi < T.hist.length) { T.hi++; inp.value = T.hist[T.hi] || ''; } }
+    else if (e.key === 'c' && e.ctrlKey) { e.preventDefault(); termWrite('^C\n'); send({ type: 'termKill', sid: S.sid }); }
+    else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); $('termOut').textContent = ''; }
+  };
+  $('tBody').onclick = (e) => { if (!window.getSelection()?.toString()) $('termIn').focus(); };
+  $('paneTerm').querySelector('.pane-more').onclick = (e) => menu(e, [
+    ['Clear', () => { $('termOut').textContent = ''; }],
+    ['Restart the shell', () => send({ type: 'termKill', sid: S.sid })],
+    ['Copy output', () => copyText($('termOut').textContent)],
+  ], 'Terminal');
+  layoutPanes();
+
+  // files served by the local server (only inside project folders and the app's data folder)
+  const fileUrl = (p, raw) => `/file?t=${encodeURIComponent(token || '')}&path=${encodeURIComponent(p)}${raw ? '&raw=1' : ''}`;
 
   // Minimal, safe Markdown (escape first, then format), with copy buttons on code blocks.
   function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -764,19 +1034,21 @@
   function renderInto(node, src, final) {
     node.innerHTML = md(src); node.dataset.raw = src;
     if (final) for (const pre of node.querySelectorAll('pre')) { const b = el('button', 'copy-btn', 'Copy'); b.onclick = () => copyText(pre.innerText.replace(/Copy$/, '')); pre.appendChild(b); }
-    for (const im of node.querySelectorAll('img.md-img')) im.onclick = () => { const body = $('previewBody'); body.innerHTML = ''; const big = el('img'); big.src = im.src; body.appendChild(big); $('previewName').textContent = im.dataset.path || 'Image'; $('previewOpen').href = im.src; previewPath = null; $('preview').hidden = false; };
+    for (const im of node.querySelectorAll('img.md-img')) im.onclick = () => openImageSrc(im.src, im.dataset.path || 'Image');
   }
   function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast('Copied'), () => toast('Copy failed', true)); }
 
   // ------------------------------------------------------------ composer
   function makeComposer(host, onSubmit, opts = {}) {
-    host.innerHTML = `<div class="box"><div class="chips"></div><div class="top"><textarea rows="1" placeholder="Message Claude…"></textarea><button class="send" title="Send (Enter)">${icon('up')}</button></div><div class="interim"></div>
-      <div class="crow"><button class="icon attach" title="Attach files">${icon('plus')}</button><input type="file" multiple hidden>
-      <button class="icon mic" title="Dictate (click to start / stop)">${icon('mic')}</button><span class="slot"></span><span class="slot-r"><span class="spin" hidden title="Claude is working"></span></span></div></div>`;
+    // claude.ai layout: text on top; below it "+", the slot (Chat/Cowork, folder), then model, mic and the send button, which only shows once there is something to send.
+    host.innerHTML = `<div class="box"><div class="chips"></div><div class="top"><textarea rows="1" placeholder="Write a message…"></textarea></div><div class="interim"></div>
+      <div class="crow"><button class="icon attach" title="Add files, skills and more">${icon('plus')}</button><input type="file" multiple hidden><span class="slot"></span>
+      <span class="slot-r"><span class="spin" hidden title="Claude is working"></span><button class="icon mic" title="Dictate (click to start / stop)">${icon('mic')}</button><button class="send" title="Send (Enter)" hidden>${icon('up')}</button></span></div></div>`;
     const ta = host.querySelector('textarea'), chips = host.querySelector('.chips'), fileIn = host.querySelector('input[type=file]');
     const sendBtn = host.querySelector('.send'), mic = host.querySelector('.mic'), interim = host.querySelector('.interim'), spin = host.querySelector('.spin');
     const attachments = []; let busy = false;
-    const autosize = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 260) + 'px'; };
+    const syncSend = () => { sendBtn.hidden = !busy && !ta.value.trim() && !attachments.length; };
+    const autosize = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 260) + 'px'; syncSend(); };
     ta.addEventListener('input', autosize);
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
@@ -791,6 +1063,7 @@
         c.appendChild(el('span', 'nm', a.name + (a.path ? '' : ' (uploading…)')));
         const x = el('button', null, '×'); x.title = 'Remove'; x.onclick = () => { attachments.splice(attachments.indexOf(a), 1); if (a.url) URL.revokeObjectURL(a.url); renderChips(); }; c.appendChild(x); chips.appendChild(c);
       }
+      syncSend();
     }
     function addFiles(list) {
       for (const f of list) {
@@ -799,8 +1072,16 @@
         const r = new FileReader(); r.onload = () => send({ type: 'upload', ref, name: f.name, data: String(r.result).split(',')[1] || '' }); r.readAsDataURL(f);
       }
     }
-    host.querySelector('.attach').onclick = () => fileIn.click();
+    // "+" menu like claude.ai: files, project folder, skills, connectors, plugins.
+    host.querySelector('.attach').onclick = (e) => {
+      const items = [{ label: 'Add files or photos', icon: 'attach', right: IS_MAC ? '⌘U' : 'Ctrl+U', fn: () => fileIn.click() }];
+      if (opts.welcome) items.push({ label: 'Add to project', icon: 'folder', arrow: true, fn: () => { if (S.tab === 'chat') { store.set('chatKind', 'cowork'); setTab('cowork'); } $('projectChip').click(); } });
+      items.push({ sep: true }, { label: 'Skills', icon: 'skill', arrow: true, fn: () => skillsMenu(e, (name) => { ta.value = `/${name} ` + ta.value; autosize(); ta.focus(); }) },
+        { label: 'Connectors', icon: 'plug', arrow: true, fn: () => showCustomize('mcp') }, { label: 'Add plugins', icon: 'puzzle', fn: () => showCustomize('plugins') });
+      richMenu(e, items);
+    };
     fileIn.onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
+    host.addFilesDialog = () => fileIn.click();
     function submit() {
       if (attachments.some((a) => !a.path)) { toast('Files are still uploading — one moment.'); return; }
       const text = ta.value.trim(); if (!text && !attachments.length) return;
@@ -809,23 +1090,29 @@
     }
     sendBtn.onclick = () => { if (busy) onSubmit(null); else submit(); };
     const rec = voice(ta, interim, mic, autosize);
+    let placeholder = opts.placeholder || 'Write a message…';
     return {
-      focus: () => ta.focus(), addFiles, slot: host.querySelector('.slot'), slotR: host.querySelector('.slot-r'),
-      setPlaceholder: (t) => (ta.placeholder = t),
+      focus: () => ta.focus(), addFiles, slot: host.querySelector('.slot'), slotR: host.querySelector('.slot-r'), openFiles: () => fileIn.click(),
+      setPlaceholder: (t) => { placeholder = t; if (!busy) ta.placeholder = t; },
       uploaded(m) { const a = attachments.find((x) => x.ref === m.ref); if (a) { a.path = m.path; renderChips(); } },
-      setBusy(v) { busy = v; sendBtn.classList.toggle('stop', v); sendBtn.title = v ? 'Stop' : 'Send (Enter)'; sendBtn.innerHTML = icon(v ? 'stop' : 'up'); spin.hidden = !v; ta.placeholder = v ? 'Type a message to send when Claude is done, or press Stop…' : (opts.placeholder || 'Message Claude…'); },
+      setBusy(v) { busy = v; sendBtn.classList.toggle('stop', v); sendBtn.title = v ? 'Stop' : 'Send (Enter)'; sendBtn.innerHTML = icon(v ? 'stop' : 'up'); spin.hidden = !v; ta.placeholder = v ? 'Type a message to send when Claude is done, or press Stop…' : placeholder; syncSend(); },
       setText(t) { ta.value = t; autosize(); ta.focus(); ta.setSelectionRange(t.length, t.length); },
       getText: () => ta.value,
     };
   }
+  function skillsMenu(e, onPick) {
+    const open = () => { const list = (S.skills || []).slice(0, 14); if (!list.length) { toast('No skills installed yet. Add some under Customize.'); showCustomize('skills'); return; } richMenu(e, list.map((s) => ({ label: s.name, desc: (s.description || '').slice(0, 70), fn: () => onPick(s.name) })).concat([{ sep: true }, { label: 'Manage skills', arrow: true, fn: () => showCustomize('skills') }])); };
+    if (S.skills === null) { send({ type: 'skills' }); onceHandlers.push((m) => { if (m.type === 'skills') open(); }); } else open();
+  }
   let pendingFirst = null;
   const welcomeComposer = makeComposer($('welcomeComposer'), (m) => {
     if (!m || m.queued) return;
+    store.set('chatKind', S.tab === 'cowork' ? 'cowork' : 'chat');
     const kind = S.tab; const cwd = kind === 'chat' ? '' : S.newFolder;
     if (kind !== 'chat') { if (!cwd) return toast('Choose a project folder first.', true); store.set('lastFolder', cwd); send({ type: 'addProject', path: cwd }); }
     pendingFirst = m;
     send({ type: 'new', kind, cwd, mode: kind === 'chat' ? undefined : (S.newMode || undefined), model: S.newModel ?? undefined, effort: S.newEffort ?? undefined });
-  });
+  }, { welcome: true, placeholder: 'How can I help you today?' });
   // queue: messages typed while Claude is still working; sent in order when the turn ends ("Send now" interrupts).
   const queues = new Map(); let editing = null;
   const sessionComposer = makeComposer($('sessionComposer'), (m) => {
@@ -855,9 +1142,9 @@
     }
   }
   function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files }); }
-  // chips under the composers (model, effort, permissions), like claude.ai
-  welcomeComposer.slot.append($('projectChip'), $('modeChip')); welcomeComposer.slotR.prepend($('modelChip'), $('effortChip'));
-  sessionComposer.slot.append($('sModeChip'), $('sBrowserChip')); sessionComposer.slotR.prepend($('sModelChip'), $('sEffortChip'));
+  // Inside the welcome composer: Chat/Cowork toggle and project folder on the left, the model picker on the right (like claude.ai).
+  welcomeComposer.slot.append($('kindSeg'), $('projectChip')); welcomeComposer.slotR.prepend($('modelChip'));
+  $('welcomeChips').remove();
   const activeComposer = () => (S.view === 'session' ? sessionComposer : welcomeComposer);
   let dragDepth = 0;
   window.addEventListener('dragenter', (e) => { if (e.dataTransfer?.types?.includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
@@ -1217,9 +1504,10 @@
     if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
     else if (e.key === '/' && !typing && !mod) { e.preventDefault(); openSearch(); }
     else if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); showWelcome(); }
+    else if (mod && e.key.toLowerCase() === 'u') { e.preventDefault(); activeComposer().openFiles(); }
     else if (mod && e.shiftKey && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); if (S.view === 'session' && S.info) deleteSession({ sid: S.info.sid, sdkId: S.info.sdkId, title: S.info.title }); }
-    else if (mod && e.key.toLowerCase() === '.') { e.preventDefault(); if (S.view === 'session') openPanel(!document.body.classList.contains('panel-open')); }
-    else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (!$('preview').hidden) { $('preview').hidden = true; previewPath = null; } }
+    else if (mod && e.key.toLowerCase() === '.') { e.preventDefault(); if (S.view === 'session') openPanel(!paneState.progress, true); }
+    else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (fullPane) setFull(fullPane, false); }
   });
 
   // ------------------------------------------------------------- settings
@@ -1227,7 +1515,6 @@
   function setPage(p) { document.querySelectorAll('.set-nav button[data-p]').forEach((b) => b.classList.toggle('active', b.dataset.p === p)); document.querySelectorAll('.set-page').forEach((x) => (x.hidden = x.dataset.page !== p)); }
   document.querySelectorAll('.set-nav button[data-p]').forEach((b) => (b.onclick = () => setPage(b.dataset.p)));
   document.querySelectorAll('.set-nav button[data-go]').forEach((b) => (b.onclick = () => { $('settingsDlg').close(); showCustomize(b.dataset.go); }));
-  $('settingsBtn').onclick = () => openSettings('general');
   $('settingsClose').onclick = () => $('settingsDlg').close();
   function applySettingsToUi() {
     const s = S.settings || {};
@@ -1286,13 +1573,30 @@
 
   // ---------------------------------------------------------------- utils
   function menu(e, entries, head) {
-    const m = $('menu'); m.innerHTML = '';
+    const m = $('menu'); m.innerHTML = ''; m.classList.remove('rich');
     if (head) m.appendChild(el('div', 'mh', head));
-    for (const ent of entries) { if (!ent) { m.appendChild(el('div', 'sep')); continue; } const [label, fn, cls, keys] = ent; const b = el('button', cls || '', label); if (keys) b.appendChild(el('kbd', '', keys)); b.onclick = () => { m.hidden = true; fn(); }; m.appendChild(b); }
+    for (const ent of entries) { if (!ent) { m.appendChild(el('div', 'sep')); continue; } const [label, fn, cls, keys] = ent; const b = el('button', cls || '', label); if (keys) b.appendChild(el('kbd', '', keys)); b.onclick = (ev) => { ev.stopPropagation(); m.hidden = true; fn(); }; m.appendChild(b); }
+    placeMenu(e, m, entries.length);
+  }
+  // Menu with descriptions, check marks and right-hand text (the claude.ai model picker).
+  function richMenu(e, items) {
+    const m = $('menu'); m.innerHTML = ''; m.classList.add('rich');
+    for (const it of items) {
+      if (it.sep) { m.appendChild(el('div', 'sep')); continue; }
+      const b = el('button', 'mi' + (it.check ? ' on' : ''));
+      b.innerHTML = `${it.icon ? icon(it.icon) : ''}<span class="mt"><span class="ml"></span><small class="md"></small></span><span class="mr"></span>`;
+      b.querySelector('.ml').textContent = it.label; b.querySelector('.md').textContent = it.desc || ''; if (!it.desc) b.querySelector('.md').remove();
+      b.querySelector('.mr').innerHTML = (it.right ? `<span class="rt"></span>` : '') + (it.check ? icon('check') : '') + (it.arrow ? '<span class="arr">›</span>' : '');
+      if (it.right) b.querySelector('.rt').textContent = it.right;
+      b.onclick = (ev) => { ev.stopPropagation(); m.hidden = true; it.fn(); }; m.appendChild(b);
+    }
+    placeMenu(e, m, items.length);
+  }
+  function placeMenu(e, m, n) {
     m.hidden = false;
-    const r = e.currentTarget?.getBoundingClientRect?.();
-    const h = m.offsetHeight || entries.length * 34 + 20;
-    let x = Math.min(r ? r.left : e.clientX, window.innerWidth - 240), y = r ? r.bottom + 4 : e.clientY;
+    const r = (e.currentTarget && e.currentTarget.getBoundingClientRect) ? e.currentTarget.getBoundingClientRect() : (e.target?.closest?.('button')?.getBoundingClientRect?.());
+    const h = m.offsetHeight || n * 34 + 20, w = m.offsetWidth || 240;
+    let x = Math.min(r ? r.left : e.clientX, window.innerWidth - w - 8), y = r ? r.bottom + 4 : e.clientY;
     if (y + h > window.innerHeight - 8) y = Math.max(8, (r ? r.top : e.clientY) - h - 4);
     m.style.left = x + 'px'; m.style.top = y + 'px';
     setTimeout(() => document.addEventListener('click', () => (m.hidden = true), { once: true }), 0);

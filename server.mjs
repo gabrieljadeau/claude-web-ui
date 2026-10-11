@@ -121,7 +121,7 @@ async function browserTabs() {
   return liveBrowser.tabs;
 }
 function browserStateMsg(extra = {}) {
-  return { type: 'browserState', live: liveBrowser.ready, page: liveBrowser.page, tabs: liveBrowser.tabs, active: liveBrowser.target, ...extra };
+  return { type: 'browserState', live: liveBrowser.ready, page: liveBrowser.page, tabs: liveBrowser.tabs, active: liveBrowser.target, following: !liveBrowser.wanted, ...extra };
 }
 // Streams the active page of the live browser as JPEG frames to every client that asked for it.
 let screencastTimer = null;

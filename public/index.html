@@ -43,6 +43,19 @@
   <symbol id="i-thumbup" viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V10H19a2 2 0 012 2l-1.5 6a2 2 0 01-2 1.5H7"/></symbol>
   <symbol id="i-thumbdown" viewBox="0 0 24 24"><path d="M17 13V4h3v9zM17 13l-4 7c-1.5 0-2.5-1-2.5-2.5V14H5a2 2 0 01-2-2l1.5-6A2 2 0 016.5 4.5H17"/></symbol>
   <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><path d="M5 7l5 5-5 5M12 17h7"/></symbol>
+  <symbol id="i-files" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M9 10v9"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
+  <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M20 10h-6V4M14 10l7-7M4 14h6v6M10 14l-7 7"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7M20 4v5h-5"/></symbol>
+  <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l12 8-12 8z"/></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5"/><path d="M8 7.5h.01M8 16.5h.01"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
   <symbol id="i-attach" viewBox="0 0 24 24"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5"/></symbol>
 </svg>
 
@@ -105,8 +118,12 @@
       <span class="spacer"></span>
       <span class="ctx" id="sCtx" title="Context window used" hidden><span class="bar"><i></i></span><span class="pct"></span></span>
       <span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span>
-      <button class="ib" id="browserBtn" title="Browser view (what Claude sees)"><svg><use href="#i-globe"/></svg></button>
-      <button class="ib" id="panelBtn" title="Progress panel"><svg><use href="#i-panel" style="transform:scale(-1,1);transform-origin:center"/></svg></button>
+      <div class="pane-btns">
+        <button class="ib" id="termBtn" title="Terminal"><svg><use href="#i-term"/></svg></button>
+        <button class="ib" id="filesBtn" title="Files"><svg><use href="#i-files"/></svg></button>
+        <button class="ib" id="browserBtn" title="Browser"><svg><use href="#i-globe"/></svg></button>
+        <button class="ib" id="panelBtn" title="Progress"><svg><use href="#i-panel" style="transform:scale(-1,1);transform-origin:center"/></svg></button>
+      </div>
     </header>
     <div class="s-body">
       <div class="s-col">
@@ -122,14 +139,63 @@
           </div></div></div>
       </div>
       <aside class="panel-side" id="panel">
-        <div class="pcard">
-        <details class="sec" id="browserSec" open hidden><summary class="sec-t">Browser <span class="sub" id="browserTitle"></span><span class="spacer"></span><button class="ib sm" id="browserClose" title="Hide">✕</button></summary>
-          <div class="bview" id="browserView"><img id="browserImg" alt=""><div class="bnote" id="browserNote">Opening the browser…</div></div></details>
-        <details class="sec" open><summary class="sec-t">Progress <span class="sub" id="progressLabel"></span></summary><div id="progressBody"></div></details>
-        <details class="sec" open><summary class="sec-t">Outputs <span class="sub" id="outCount"></span></summary><div id="outputs"></div></details>
-        <details class="sec" open><summary class="sec-t">Context</summary><div id="contextBody"></div></details>
-        <details class="sec"><summary class="sec-t">Steps <span class="sub" id="stepCount"></span></summary><div class="acts" id="acts"></div></details>
-        <div hidden><div id="used"></div></div>
+        <div class="panel-resize" id="panelResize" title="Drag to resize"></div>
+        <!-- Browser: the Chrome window Claude drives, streamed live; tabs, address bar and the page itself can be used directly. -->
+        <div class="pane" id="paneBrowser" data-pane="browser" hidden>
+          <div class="pane-head">
+            <div class="btabs" id="btabs"></div><button class="ib sm" id="btabNew" title="New tab"><svg><use href="#i-plus"/></svg></button>
+            <span class="spacer"></span>
+            <button class="ib sm" id="bFollow" title="Follow the page Claude is working on"><svg><use href="#i-star"/></svg></button>
+            <button class="ib sm pane-more" title="More"><svg><use href="#i-vmore"/></svg></button><button class="ib sm pane-full" title="Full screen"><svg><use href="#i-expand"/></svg></button><button class="ib sm pane-close" title="Close"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="btoolbar">
+            <button class="ib sm" id="bBack" title="Back"><svg><use href="#i-back"/></svg></button><button class="ib sm" id="bFwd" title="Forward"><svg><use href="#i-fwd"/></svg></button><button class="ib sm" id="bReload" title="Reload"><svg><use href="#i-reload"/></svg></button>
+            <input id="bUrl" placeholder="Type a URL" spellcheck="false" autocomplete="off">
+            <button class="ib sm on" id="bPointer" title="Interact with the page (clicks and keys go to the browser)"><svg><use href="#i-pointer"/></svg></button>
+          </div>
+          <div class="bbody" id="bBody" tabindex="0">
+            <img id="browserImg" alt="" draggable="false">
+            <div class="bempty" id="bEmpty">
+              <div class="launch" id="launchList"></div>
+              <p class="bhint" id="bHint"></p>
+            </div>
+          </div>
+          <div class="blogs" id="bLogs" hidden><div class="blogs-head"><span id="bLogsName"></span><span class="spacer"></span><button class="ib sm" id="bLogsClose" title="Hide logs"><svg><use href="#i-close"/></svg></button></div><pre id="bLogsPre"></pre></div>
+        </div>
+        <div class="pane-gap" hidden></div>
+        <!-- Files: the session folder as a tree, with a viewer for the files opened here or from the conversation. -->
+        <div class="pane" id="paneFiles" data-pane="files" hidden>
+          <div class="pane-head"><svg class="pi"><use href="#i-files"/></svg><b>Files</b><span class="spacer"></span>
+            <button class="ib sm" id="fSearchBtn" title="Search in files"><svg><use href="#i-search"/></svg></button>
+            <button class="ib sm pane-more" title="More"><svg><use href="#i-vmore"/></svg></button><button class="ib sm pane-full" title="Full screen"><svg><use href="#i-expand"/></svg></button><button class="ib sm pane-close" title="Close"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="fbody">
+            <div class="ftree"><label class="ffilter"><svg><use href="#i-search"/></svg><input id="fFilter" placeholder="Filter, or ? to search in files" spellcheck="false"></label><div class="ftree-list" id="ftree"></div></div>
+            <div class="fsplit" id="fSplit"></div>
+            <div class="fview"><div class="ftabs" id="ftabs"></div><div class="fcontent" id="fcontent"><div class="fempty"><svg><use href="#i-folder"/></svg><b>Open files appear here</b><span>Pick a file in the tree, or click a file path in the conversation.</span></div></div></div>
+          </div>
+        </div>
+        <div class="pane-gap" hidden></div>
+        <!-- Terminal: a shell in the session folder. -->
+        <div class="pane" id="paneTerm" data-pane="term" hidden>
+          <div class="pane-head"><svg class="pi"><use href="#i-term"/></svg><b>Terminal</b><span class="sub" id="termCwd"></span><span class="spacer"></span>
+            <button class="ib sm pane-more" title="More"><svg><use href="#i-vmore"/></svg></button><button class="ib sm pane-full" title="Full screen"><svg><use href="#i-expand"/></svg></button><button class="ib sm pane-close" title="Close"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="tbody" id="tBody"><pre id="termOut"></pre><div class="tline"><span class="tp">$</span><input id="termIn" placeholder="Type a command and press Enter" spellcheck="false" autocomplete="off"></div></div>
+        </div>
+        <div class="pane-gap" hidden></div>
+        <!-- Progress: plan, outputs and steps of the current chat. -->
+        <div class="pane" id="paneProgress" data-pane="progress">
+          <div class="pane-head"><svg class="pi"><use href="#i-panel"/></svg><b>Progress</b><span class="spacer"></span>
+            <button class="ib sm pane-full" title="Full screen"><svg><use href="#i-expand"/></svg></button><button class="ib sm pane-close" title="Close"><svg><use href="#i-close"/></svg></button>
+          </div>
+          <div class="pbody">
+            <details class="sec" open><summary class="sec-t">Plan <span class="sub" id="progressLabel"></span></summary><div id="progressBody"></div></details>
+            <details class="sec" open><summary class="sec-t">Outputs <span class="sub" id="outCount"></span></summary><div id="outputs"></div></details>
+            <details class="sec" open><summary class="sec-t">Context</summary><div id="contextBody"></div></details>
+            <details class="sec"><summary class="sec-t">Steps <span class="sub" id="stepCount"></span></summary><div class="acts" id="acts"></div></details>
+            <div hidden><div id="used"></div><div id="usageSec"></div></div>
+          </div>
         </div>
       </aside>
     </div>
@@ -348,9 +414,6 @@
   </form>
 </dialog>
 
-<div id="preview" class="preview" hidden>
-  <div class="preview-head"><span class="nm" id="previewName"></span><span class="spacer"></span><button class="btn" id="previewReveal">Show in folder</button><a class="btn" id="previewOpen" target="_blank" rel="noopener">Open in new tab</a><button class="ib" id="previewClose" title="Close">✕</button></div>
-  <div class="preview-body" id="previewBody"></div>
 </div>
 
 <!-- Folder picker -->
