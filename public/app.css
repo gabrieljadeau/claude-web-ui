@@ -502,20 +502,4 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 .act .detail img { max-width: 100%; border-radius: 6px; border: 1px solid var(--line); margin: 4px 0; }
 .prose img.md-img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line2); margin: 6px 0; cursor: zoom-in; display: block; }
 
-/* ---- session header: kind icon, title dropdown; composer footer */
-.s-kind-ic { width: 18px; height: 18px; color: var(--muted); flex: none; }
-.s-title-btn { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 60%; border: 0; background: none; padding: 4px 8px; border-radius: 8px; font-weight: 600; font-size: 14.5px; color: var(--ink); }
-.s-title-btn:hover { background: var(--soft); }
-.s-title-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.s-title-btn .chev { width: 14px; height: 14px; color: var(--muted); flex: none; }
-.cfoot { display: flex; align-items: center; gap: 8px; padding: 6px 4px 0; font-size: 11.5px; color: var(--muted); }
-.cfoot-c { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cfoot-l, .cfoot-r { display: inline-flex; gap: 4px; flex: none; }
-.fbtn { border: 0; background: none; border-radius: 6px; padding: 3px 7px; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.fbtn:hover { background: var(--soft); color: var(--ink); } .fbtn small { font-size: 11px; opacity: .8; }
-
-/* ---- generic chevrons, user button text, More nav */
-svg.chev { width: 14px; height: 14px; color: var(--muted); flex: none; }
-.more-nav .chev { transition: transform .15s; } .more-nav.open .chev { transform: rotate(180deg); }
-body.panel-open.panel-wide .s-body { grid-template-columns: 1fr 480px; }
 .panel-side .used { padding-top: 6px; }
