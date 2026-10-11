@@ -24,7 +24,8 @@
     newFolder: store.get('lastFolder', ''), newMode: null, newModel: null, newEffort: null,
   };
   const KIND_LABEL = { chat: 'Chat', cowork: 'Cowork', code: 'Code', routine: 'Routine' };
-  const MODE_LABEL = { default: 'Ask before changes', acceptEdits: 'Auto-accept edits', bypassPermissions: 'Autonomous', plan: 'Plan only' };
+  const MODE_LABEL = { auto: 'Auto (Claude decides, asks when unsure)', acceptEdits: 'Auto-accept edits', default: 'Ask before changes', bypassPermissions: 'Autonomous (never asks)', plan: 'Plan only' };
+  const MODE_SHORT = { auto: 'Auto', acceptEdits: 'Auto-accept edits', default: 'Ask before changes', bypassPermissions: 'Autonomous', plan: 'Plan only' };
   const EFFORT_LABEL = { '': 'Default effort', low: 'Low effort', medium: 'Medium effort', high: 'High effort', xhigh: 'Very high effort', max: 'Max effort' };
   const MODELS = [['', 'Default model'], ['opus', 'Opus'], ['sonnet', 'Sonnet'], ['haiku', 'Haiku'], ['__custom', 'Custom ID…']];
   const modelLabel = (m) => (m ? ({ opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' }[m] || shortModel(m)) : 'Default model');
@@ -218,7 +219,7 @@
       $('projectChip').title = S.newFolder || '';
     }
     const mode = S.newMode || (S.tab === 'cowork' ? S.settings.coworkMode : S.settings.mode) || 'default';
-    $('modeChipText').textContent = MODE_LABEL[mode];
+    $('modeChipText').textContent = MODE_SHORT[mode] || mode;
     $('modelChipText').textContent = modelLabel(S.newModel ?? S.settings.model ?? '');
     $('effortChipText').textContent = EFFORT_LABEL[S.newEffort ?? S.settings.effort ?? ''] || 'Default effort';
   }
@@ -276,7 +277,7 @@
     renderCtx($('sCtx'), i.context);
     $('sModelChip').querySelector('span').textContent = modelLabel(i.model);
     $('sEffortChip').querySelector('span').textContent = EFFORT_LABEL[i.effort || ''];
-    $('sModeChip').querySelector('span').textContent = MODE_LABEL[i.mode] || i.mode; $('sModeChip').hidden = i.kind === 'chat';
+    $('sModeChip').querySelector('span').textContent = MODE_SHORT[i.mode] || i.mode; $('sModeChip').hidden = i.kind === 'chat';
     $('sBrowserChip').querySelector('span').textContent = i.browser ? 'Browser: on' : 'Browser: off'; $('sBrowserChip').hidden = i.kind === 'chat';
     $('sPin').classList.toggle('on', !!i.pinned);
     $('panelBtn').classList.toggle('on', document.body.classList.contains('panel-open'));
@@ -888,7 +889,7 @@
     $('reTitle').textContent = id ? 'Edit routine' : 'New routine';
     $('reName').value = r.name || ''; $('rePrompt').value = r.prompt || '';
     $('reCwd').value = r.cwd || S.newFolder || S.projects[0]?.path || S.home;
-    $('reMode').value = r.mode || S.settings.coworkMode || 'acceptEdits'; $('reModel').value = r.model || '';
+    $('reMode').value = r.mode || S.settings.coworkMode || 'auto'; $('reModel').value = r.model || '';
     const s = r.schedule || { type: 'daily', time: '09:00', days: [1, 2, 3, 4, 5] };
     $('reType').value = s.type; $('reTime').value = s.time || '09:00'; $('reEvery').value = s.every || 60;
     $('reAt').value = toLocalInput(s.at || new Date(Date.now() + 3600000).toISOString());
@@ -1103,7 +1104,7 @@
     const s = S.settings || {};
     fillModelSelect($('setModel'), s.model || '');
     $('setEffort').value = s.effort || '';
-    $('setMode').value = s.mode || 'default'; $('setCoworkMode').value = s.coworkMode || 'acceptEdits';
+    $('setMode').value = s.mode || 'default'; $('setCoworkMode').value = s.coworkMode || 'auto';
     $('setBrowser').checked = s.browser !== false; $('setLang').value = s.lang || 'fr-FR';
     $('setSpeak').checked = store.get('speak', false); $('setArchived').checked = S.showArchived;
     if (document.activeElement !== $('setName')) $('setName').value = s.name || S.user || '';

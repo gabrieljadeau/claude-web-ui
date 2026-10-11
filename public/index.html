@@ -188,7 +188,7 @@
         <label>What should Claude do? <textarea id="rePrompt" required rows="6" placeholder="Read the new files in the Inbox folder, summarise them in SUMMARY.md…"></textarea></label>
         <div class="row2">
           <label>Folder <span class="inline"><input id="reCwd" required placeholder="/path/to/folder"><button type="button" class="btn" id="reBrowse">Browse…</button></span></label>
-          <label>Permissions <select id="reMode"><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes (needs you present)</option></select></label>
+          <label>Permissions <select id="reMode"><option value="auto">Auto: Claude decides, safe actions run (recommended)</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes (needs you present)</option></select></label>
         </div>
         <div class="row2">
           <label>Repeat <select id="reType"><option value="daily">Every day at a time</option><option value="interval">Every N minutes</option><option value="once">Once, at a date and time</option></select></label>
@@ -300,8 +300,8 @@
       <h3>Claude Code</h3>
       <div class="set-row"><div><b>Default model</b><small>Default, Opus, Sonnet, Haiku or a custom ID (for example a Bedrock inference profile).</small></div><select id="setModel"></select></div>
       <div class="set-row"><div><b>Thinking effort</b><small>How hard Claude thinks before answering. Higher is slower and costs more.</small></div><select id="setEffort"><option value="">Default</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Very high</option><option value="max">Max</option></select></div>
-      <div class="set-row"><div><b>Permissions for Code sessions</b></div><select id="setMode"><option value="default">Ask before changes</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="plan">Plan only</option></select></div>
-      <div class="set-row"><div><b>Permissions for Cowork and routines</b></div><select id="setCoworkMode"><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes</option></select></div>
+      <div class="set-row"><div><b>Permissions for Code sessions</b></div><select id="setMode"><option value="default">Ask before changes</option><option value="auto">Auto: Claude decides, asks when unsure</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="plan">Plan only</option></select></div>
+      <div class="set-row"><div><b>Permissions for Cowork and routines</b></div><select id="setCoworkMode"><option value="auto">Auto: Claude decides, asks when unsure</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes</option></select></div>
       <div class="set-row"><div><b>Browser actions</b><small>Let Claude open and drive a web browser (Playwright) in new sessions.</small></div><label class="switch"><input type="checkbox" id="setBrowser"><span></span></label></div>
     </div>
     <div data-page="feedback" class="set-page" hidden>

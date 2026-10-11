@@ -44,7 +44,8 @@ const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 
 for (const d of [DATA_DIR, CHAT_DIR, UPLOAD_DIR, PROBE_DIR]) fs.mkdirSync(d, { recursive: true });
 
 const KINDS = ['chat', 'cowork', 'code', 'routine'];
-const MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions'];
+const MODES = ['default', 'acceptEdits', 'auto', 'plan', 'bypassPermissions'];
+const READ_ONLY_TOOLS = new Set(['WebSearch', 'WebFetch', 'Read', 'Glob', 'Grep', 'LS']);
 const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
 const REPO = detectRepo();
 
@@ -68,10 +69,12 @@ function browserServer() {
 // ------------------------------------------------------- persistent state
 const state = loadState();
 function loadState() {
-  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'default', coworkMode: 'acceptEdits', browser: true, lang: 'fr-FR', repo: '', githubToken: '' } };
+  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'default', coworkMode: 'auto', browser: true, lang: 'fr-FR', repo: '', githubToken: '' } };
   try {
     const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    return { ...def, ...s, settings: { ...def.settings, ...(s.settings || {}) } };
+    const st = { ...def, ...s, settings: { ...def.settings, ...(s.settings || {}) } };
+    if (!st.settings.v) { st.settings.v = 2; if (st.settings.coworkMode === 'acceptEdits') st.settings.coworkMode = 'auto'; } // 0.2: Cowork defaults to Auto
+    return st;
   } catch { return def; }
 }
 let saveTimer = null;
@@ -196,6 +199,8 @@ function allowKey(toolName) {
 function makePermissionHandler(rt) {
   return (toolName, input, { signal }) => {
     if (rt.alwaysAllow.has(allowKey(toolName))) return Promise.resolve({ behavior: 'allow', updatedInput: input });
+    // Read-only lookups never need a prompt once the user already accepted edits.
+    if (rt.mode === 'acceptEdits' && READ_ONLY_TOOLS.has(toolName)) return Promise.resolve({ behavior: 'allow', updatedInput: input });
     return new Promise((resolve) => {
       const id = crypto.randomUUID();
       rt.pending.set(id, (answer) => {
@@ -341,7 +346,29 @@ function handleSdkMessage(rt, m) {
     emit(rt, { type: 'done', ok, cost: turnCost, ms: m.duration_ms || 0, context: rt.context, model,
       message: ok ? null : (m.errors?.join?.('\n') || m.result || m.subtype) });
     if (!ok && m.startup_failure_reason) checkAuth();
+    if (!rt.title && !rt.titling && rt.kind !== 'routine') autoTitle(rt);
   }
+}
+
+// ---- automatic conversation titles: a 3-7 word title from the first exchange, written by a small model
+async function autoTitle(rt) {
+  rt.titling = true;
+  const first = rt.items.find((i) => i.type === 'user')?.text || '';
+  const reply = rt.liveText || [...rt.items].reverse().find((i) => i.type === 'assistant')?.text || '';
+  if (!first) { rt.titling = false; return; }
+  const prompt = `Write a title for this conversation: 3 to 7 words, in the language of the user, no quotes, no trailing period, Title Case not required.\n\nUser:\n${first.slice(0, 1500)}\n\nAssistant:\n${reply.slice(0, 800)}`;
+  try {
+    const q = query({ prompt, options: { cwd: PROBE_DIR, tools: [], maxTurns: 1, model: 'haiku', permissionMode: 'default', systemPrompt: 'You write short conversation titles. Reply with the title only.' } });
+    let title = '';
+    for await (const m of q) if (m.type === 'result' && m.subtype === 'success') title = String(m.result || '');
+    title = title.split('\n')[0].replace(/^["'“”«»\s]+|["'“”«»\s.]+$/g, '').slice(0, 80);
+    if (!title || rt.title) return;
+    rt.title = title;
+    if (rt.sdkId) await renameSession(rt.sdkId, title, { dir: rt.cwd }).catch(() => {});
+    broadcast({ type: 'info', info: sessionInfo(rt) });
+    invalidateListing(); sidebarDirty();
+  } catch { /* a missing title is not worth an error */ }
+  finally { rt.titling = false; }
 }
 
 // ---- opening sessions saved on disk (by the terminal `claude` or by this app)
@@ -474,7 +501,7 @@ function normalizeRoutine(input, prev = {}) {
     name: String(input.name || prev.name || 'Routine').slice(0, 120),
     prompt: String(input.prompt ?? prev.prompt ?? '').slice(0, 20000),
     cwd: String(input.cwd || prev.cwd || os.homedir()),
-    mode: MODES.includes(input.mode) ? input.mode : (prev.mode || 'acceptEdits'),
+    mode: MODES.includes(input.mode) ? input.mode : (prev.mode || 'auto'),
     model: typeof input.model === 'string' ? input.model.slice(0, 200) : (prev.model || ''),
     enabled: typeof input.enabled === 'boolean' ? input.enabled : (prev.enabled ?? true),
     schedule: input.schedule || prev.schedule || { type: 'daily', time: '09:00', days: [1, 2, 3, 4, 5] },
@@ -776,6 +803,7 @@ wss.on('connection', async (ws) => {
             invalidateListing();
           }
           emit(rt, { type: 'user', text, files: files.map((f) => path.basename(f)), prev: rt.lastUuid });
+          if (!rt.title) broadcast({ type: 'info', info: sessionInfo(rt) });
           if (files.length) text += `\n\nAttached files (read them with your tools):\n${files.map((f) => `- ${f}`).join('\n')}`;
           runTurn(rt, text);
           sidebarDirty();
