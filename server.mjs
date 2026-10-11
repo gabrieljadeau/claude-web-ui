@@ -976,7 +976,7 @@ function projects() {
 // schedule = { type: 'interval', every: <minutes> } | { type: 'daily', time: 'HH:MM', days: [0..6] } | { type: 'once', at: <ISO> }
 function computeNextRun(r, from = Date.now()) {
   const s = r.schedule || {};
-  if (s.type === 'interval') { const ms = Math.max(1, Number(s.every) || 60) * 60000; return (r.lastRun || from) + ms; }
+  if (s.type === 'interval') { const ms = Math.max(1, Number(s.every) || 60) * 60000; const t = (r.lastRun || from) + ms; return t > from ? t : from + ms; }   // a run missed while the computer was off moves to the next slot, not into the past
   if (s.type === 'once') { const t = Date.parse(s.at); return Number.isFinite(t) && t > (r.lastRun || 0) ? t : null; }
   if (s.type === 'daily') {
     const [hh, mm] = String(s.time || '09:00').split(':').map(Number);
@@ -1023,7 +1023,7 @@ async function runRoutine(r, manual = false) {
   r.runs.unshift(run); r.runs = r.runs.slice(0, 30);
   emit(rt, { type: 'user', text: r.prompt });
   sidebarDirty();
-  runTurn(rt, r.prompt).then(() => {
+  runTurn(rt, r.prompt).catch((err) => console.error(`  Routine "${r.name}" failed: ${err?.message || err}`)).finally(() => {
     const last = rt.items.filter((i) => i.type === 'done').pop();
     run.sdkId = rt.sdkId; run.ok = last ? last.ok : false; run.cost = rt.cost;
     routineRunning.delete(r.id);
