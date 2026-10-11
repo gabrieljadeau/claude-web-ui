@@ -156,6 +156,7 @@
   const space = () => (S.tab === 'code' ? 'code' : 'chat');
   function setTab(tab) {
     S.tab = tab; store.set('tab', tab);
+    if (S.selecting && !S.suggesting) { S.selecting = false; S.selected = new Set(); S.suggest = null; }   // a selection belongs to one space
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === space()));
     // The Code space is its own product on claude.ai: "Claude Code", Routines, task composer docked at the bottom.
     document.body.classList.toggle('space-code', space() === 'code');
@@ -208,13 +209,7 @@
       const pinned = items.filter((s) => s.pinned);
       if (pinned.length) { section(tr('Pinned')); for (const s of pinned.sort((a, b) => b.when - a.when)) box.appendChild(sessionRow(s)); }
       const rest = items.filter((s) => !s.pinned).sort((a, b) => b.when - a.when);
-      const filter = el('button', 'ib sm'); filter.title = tr('Options'); filter.innerHTML = icon('filter');
-      filter.onclick = (e) => menu(e, [
-        [tr('Refresh'), () => send({ type: 'sessions' })],
-        [tr('Select…'), () => setSelecting(true)],
-        [tr('Suggest chats to delete'), suggestCleanup],
-      ]);
-      section(tr('Chats and tasks'), filter);
+      section(tr('Chats and tasks'), optionsButton());
       if (S.selecting || S.suggesting) box.appendChild(selectBar());
       if (!rest.length && !pinned.length) { box.appendChild(el('div', 'empty-list', tr('Chats and tasks you start will show up here'))); return; }
       for (const s of rest) box.appendChild(sessionRow(s));
@@ -224,7 +219,8 @@
     for (const p of S.projects) groups.set(p.path, { name: p.name, path: p.path, items: [] });
     for (const s of items) { const k = s.cwd || '?'; if (!groups.has(k)) groups.set(k, { name: folderName(s.cwd), path: s.cwd || '', items: [] }); groups.get(k).items.push(s); }
     const arr = [...groups.values()].sort((a, b) => (latest(b) - latest(a)) || a.name.localeCompare(b.name));
-    section(tr('Sessions'));
+    section(tr('Sessions'), optionsButton());
+    if (S.selecting || S.suggesting) box.appendChild(selectBar());
     if (!arr.length) { box.appendChild(el('div', 'empty-list', tr('Sessions you start will show up here'))); return; }
     for (const g of arr) box.appendChild(group(g.name, g.items, g.path));
   }
@@ -273,7 +269,7 @@
     b.tabIndex = 0; b.setAttribute('role', 'button');
     b.innerHTML = `<span class="st"></span><span class="t"><span class="tt"></span></span><button class="ib sm more" title="${tr('More actions')}">${icon('vmore')}</button>`;
     b.querySelector('.tt').textContent = s.title;
-    if (S.selecting && space() === 'chat') {
+    if (S.selecting) {
       // select mode: a checkbox replaces the status dot, a click toggles instead of opening
       const on = S.selected.has(s.sid);
       b.classList.add('selectable'); b.classList.toggle('sel', on);
@@ -309,10 +305,19 @@
     renderList();
   }
   function toggleSelected(sid) { if (S.selected.has(sid)) S.selected.delete(sid); else S.selected.add(sid); renderList(); }
-  const selectableSids = () => visibleSessions('chat').map((s) => s.sid);
+  const selectableSids = () => visibleSessions(space()).map((s) => s.sid);
+  function optionsButton() {
+    const b = el('button', 'ib sm'); b.title = tr('Options'); b.innerHTML = icon('filter');
+    b.onclick = (e) => menu(e, [
+      [tr('Refresh'), () => send({ type: 'sessions' })],
+      [tr('Select…'), () => setSelecting(true)],
+      [space() === 'code' ? tr('Suggest sessions to delete') : tr('Suggest chats to delete'), suggestCleanup],
+    ]);
+    return b;
+  }
   function selectBar() {
     const bar = el('div', 'sel-bar');
-    if (S.suggesting) { bar.appendChild(el('span', 'sel-n', tr('Looking for chats to delete…'))); return bar; }
+    if (S.suggesting) { bar.appendChild(el('span', 'sel-n', space() === 'code' ? tr('Looking for sessions to delete…') : tr('Looking for chats to delete…'))); return bar; }
     const n = S.selected.size, all = selectableSids();
     bar.appendChild(el('span', 'sel-n', S.suggest && n ? tr('{n} suggested', { n }) : tr('{n} selected', { n })));
     const btn = (label, fn, cls) => { const b = el('button', 'sel-btn' + (cls ? ' ' + cls : ''), label); b.onclick = fn; bar.appendChild(b); return b; };
@@ -325,7 +330,7 @@
     const sids = [...S.selected].filter((sid) => S.sessions.some((s) => s.sid === sid));
     if (!sids.length) return;
     const one = S.sessions.find((s) => s.sid === sids[0]);
-    const q = sids.length === 1 ? tr('Delete “{title}”? This cannot be undone.', { title: one.title || tr('this conversation') }) : tr('Delete {n} chats? This cannot be undone.', { n: sids.length });
+    const q = sids.length === 1 ? tr('Delete “{title}”? This cannot be undone.', { title: one.title || tr('this conversation') }) : space() === 'code' ? tr('Delete {n} sessions? This cannot be undone.', { n: sids.length }) : tr('Delete {n} chats? This cannot be undone.', { n: sids.length });
     if (!confirm(q)) return;
     send({ type: 'deleteMany', sids });
     if (sids.some((sid) => S.sid === sid || (S.info && S.sessions.find((s) => s.sid === sid)?.sdkId === S.info.sdkId))) showWelcome();
@@ -334,7 +339,7 @@
   function suggestCleanup() {
     if (S.suggesting) return;
     S.suggesting = true; S.selecting = true; S.selected = new Set(); S.suggest = null; renderList();
-    send({ type: 'suggestCleanup' });
+    send({ type: 'suggestCleanup', space: space() });
   }
   function onCleanupSuggest(m) {
     S.suggesting = false;

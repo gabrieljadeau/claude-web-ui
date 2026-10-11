@@ -909,15 +909,17 @@ async function removeSession(sid) {
 }
 // "Suggest chats to delete": a small model reads the chat list (titles, age, size) and picks the throwaway ones —
 // tests, one-word greetings, duplicates, empty chats. The user still reviews and confirms in the sidebar.
-async function suggestCleanup() {
+async function suggestCleanup(which = 'chat') {
   const disk = await listing();
   const size = new Map(disk.map((s) => [s.sessionId, s.messageCount ?? s.messages?.length ?? null]));
-  const all = (await sidebar()).filter((s) => (s.kind === 'chat' || s.kind === 'cowork') && !s.pinned && !s.archived && s.status === 'idle');
+  const code = which === 'code';
+  const all = (await sidebar()).filter((s) => (code ? s.kind === 'code' : s.kind === 'chat' || s.kind === 'cowork') && !s.pinned && !s.archived && s.status === 'idle');
   if (!all.length) return { items: [] };
   const items = all.slice(0, 300);
   const day = 86400000, now = Date.now();
-  const lines = items.map((s, i) => { const n = size.get(s.sdkId); return `${i + 1}. "${String(s.title).replace(/"/g, "'").slice(0, 90)}" · ${Math.max(0, Math.round((now - s.when) / day))}d old${n != null ? ` · ${n} msgs` : ''}${s.kind === 'cowork' ? ' · task' : ''}`; }).join('\n');
-  const prompt = `Here is a list of chats from a Claude app. Pick the ones that are clearly throwaway and safe to delete: connection tests, one-word greetings ("say hello", "reply with one word"), trivial questions already asked again later (keep the newest copy), untitled or empty chats. Keep anything that looks like real work, a project, a plan, code, or a document. When unsure, keep it.\n\nReply with JSON only: {"delete":[{"i":<number>,"why":"<4 to 8 words, in the language of the chat titles>"}]}\n\n${lines}`;
+  const lines = items.map((s, i) => { const n = size.get(s.sdkId); return `${i + 1}. "${String(s.title).replace(/"/g, "'").slice(0, 90)}" · ${Math.max(0, Math.round((now - s.when) / day))}d old${n != null ? ` · ${n} msgs` : ''}${s.kind === 'cowork' ? ' · task' : ''}${code ? ' · in ' + (path.basename(s.cwd || '') || 'home') : ''}`; }).join('\n');
+  const what = code ? 'coding sessions (each in a project folder)' : 'chats';
+  const prompt = `Here is a list of ${what} from a Claude app. Pick the ones that are clearly throwaway and safe to delete: connection tests, one-word greetings ("say hello", "reply with one word"), trivial questions already asked again later (keep the newest copy), untitled or empty ${code ? 'sessions' : 'chats'}. Keep anything that looks like real work, a project, a plan, code changes, or a document. When unsure, keep it.\n\nReply with JSON only: {"delete":[{"i":<number>,"why":"<4 to 8 words, in the language of the titles>"}]}\n\n${lines}`;
   try {
     const q = query({ prompt, options: { cwd: PROBE_DIR, tools: [], maxTurns: 1, model: 'haiku', permissionMode: 'default', systemPrompt: 'You tidy chat lists. Reply with JSON only, no prose, no code fence.' } });
     let out = '';
@@ -1347,7 +1349,7 @@ wss.on('connection', async (ws) => {
           invalidateListing(); sidebarDirty();
           break;
         }
-        case 'suggestCleanup': send({ type: 'cleanupSuggest', ...(await suggestCleanup()) }); break;
+        case 'suggestCleanup': send({ type: 'cleanupSuggest', ...(await suggestCleanup(msg.space === 'code' ? 'code' : 'chat')) }); break;
         case 'sessions': invalidateListing(); send({ type: 'sessions', items: await sidebar(), projects: projects() }); break;
         case 'artifacts': send({ type: 'artifacts', items: await artifacts() }); break;
         case 'dashboard': send({ type: 'dashboard', usage: state.usage.slice(-3000), items: await sidebar(), routines: state.routines }); break;
