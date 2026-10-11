@@ -513,7 +513,7 @@
   let workTimer = null;
   function showWorking(label) {
     if (!V) return;
-    if (!V.working) { V.working = el('div', 'working'); V.working.innerHTML = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl"></span><span class="t"></span>'; V.workStart = Date.now(); clearInterval(workTimer); workTimer = setInterval(() => { if (V?.working) V.working.querySelector('.t').textContent = fmtDur(Math.round((Date.now() - V.workStart) / 1000)); }, 1000); }
+    if (!V.working) { V.working = el('div', 'working'); V.working.innerHTML = '<span class="wstar" aria-hidden="true">' + icon('star') + '</span><span class="lbl"></span><span class="t"></span>'; V.workStart = Date.now(); clearInterval(workTimer); workTimer = setInterval(() => { if (V?.working) V.working.querySelector('.t').textContent = fmtDur(Math.round((Date.now() - V.workStart) / 1000)); }, 1000); }
     if (label) V.current = label;
     V.working.querySelector('.lbl').textContent = V.current || tr('Working');
     keepWorkingLast(); scrollDown(); renderPanelLight();

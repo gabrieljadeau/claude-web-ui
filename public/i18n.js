@@ -6,6 +6,30 @@
   const LANGS = { en: 'English', fr: 'Français', es: 'Español', it: 'Italiano', de: 'Deutsch' };
   const LOCALE = { en: 'en-US', fr: 'fr-FR', es: 'es-ES', it: 'it-IT', de: 'de-DE' };
   const T = {
+    // ---- voice mode
+    'Voice mode': ["Mode vocal", "Modo de voz", "Modalità vocale", "Sprachmodus"],
+    'Listening…': ["Je vous écoute…", "Te escucho…", "Ti ascolto…", "Ich höre zu…"],
+    'Thinking…': ["Je réfléchis…", "Pensando…", "Sto pensando…", "Ich überlege…"],
+    'Speaking… tap the circle to interrupt': ["Je parle… touchez le cercle pour m’interrompre", "Hablando… toca el círculo para interrumpir", "Sto parlando… tocca il cerchio per interrompere", "Ich spreche… tippe auf den Kreis zum Unterbrechen"],
+    'Microphone off': ["Micro coupé", "Micrófono apagado", "Microfono spento", "Mikrofon aus"],
+    'Mute': ["Couper le micro", "Silenciar", "Disattiva microfono", "Stumm"],
+    'Unmute': ["Réactiver le micro", "Activar micrófono", "Riattiva microfono", "Mikrofon an"],
+    'End': ["Terminer", "Terminar", "Termina", "Beenden"],
+    'Back to text': ["Revenir au texte", "Volver al texto", "Torna al testo", "Zurück zum Text"],
+    'End voice mode': ["Quitter le mode vocal", "Salir del modo de voz", "Esci dalla modalità vocale", "Sprachmodus beenden"],
+    'Tap to interrupt, or to send what you said': ["Touchez pour interrompre, ou pour envoyer ce que vous avez dit", "Toca para interrumpir o para enviar lo que dijiste", "Tocca per interrompere o per inviare ciò che hai detto", "Tippen zum Unterbrechen oder zum Senden des Gesagten"],
+    'Voice mode needs Google Chrome or Microsoft Edge.': ["Le mode vocal nécessite Google Chrome ou Microsoft Edge.", "El modo de voz necesita Google Chrome o Microsoft Edge.", "La modalità vocale richiede Google Chrome o Microsoft Edge.", "Der Sprachmodus braucht Google Chrome oder Microsoft Edge."],
+    'I need your approval in the chat before I can continue.': ["J’ai besoin de votre accord dans le chat pour continuer.", "Necesito tu aprobación en el chat para continuar.", "Ho bisogno della tua approvazione nella chat per continuare.", "Ich brauche deine Freigabe im Chat, um fortzufahren."],
+    'Say something, I am listening.': ["Dites quelque chose, je vous écoute.", "Di algo, te escucho.", "Di’ qualcosa, ti ascolto.", "Sag etwas, ich höre zu."],
+    'Hello! This is how I will sound when I read replies to you.': ["Bonjour ! Voici la voix que j’utiliserai pour vous lire mes réponses.", "¡Hola! Así sonaré cuando te lea mis respuestas.", "Ciao! Ecco come suonerò quando ti leggerò le risposte.", "Hallo! So klinge ich, wenn ich dir Antworten vorlese."],
+    'Automatic (best available)': ["Automatique (la meilleure disponible)", "Automática (la mejor disponible)", "Automatica (la migliore disponibile)", "Automatisch (beste verfügbare)"],
+    '(code)': ["(code)", "(código)", "(codice)", "(Code)"],
+    '(link)': ["(lien)", "(enlace)", "(link)", "(Link)"],
+    'Voice': ["Voix", "Voz", "Voce", "Stimme"],
+    'System voice used to read replies, for the language above.': ["Voix système utilisée pour lire les réponses, pour la langue ci-dessus.", "Voz del sistema usada para leer las respuestas, para el idioma de arriba.", "Voce di sistema usata per leggere le risposte, per la lingua sopra.", "Systemstimme zum Vorlesen der Antworten, für die Sprache oben."],
+    'Speaking rate': ["Vitesse de lecture", "Velocidad de lectura", "Velocità di lettura", "Sprechtempo"],
+    'Click the waveform in the message box to talk with Claude hands-free. Needs Google Chrome or Microsoft Edge.': ["Cliquez sur l’onde dans la zone de message pour parler avec Claude sans les mains. Nécessite Google Chrome ou Microsoft Edge.", "Haz clic en la onda del cuadro de mensaje para hablar con Claude sin usar las manos. Necesita Google Chrome o Microsoft Edge.", "Clicca sull’onda nel riquadro del messaggio per parlare con Claude a mani libere. Richiede Google Chrome o Microsoft Edge.", "Klicke auf die Wellenform im Nachrichtenfeld, um freihändig mit Claude zu sprechen. Braucht Google Chrome oder Microsoft Edge."],
+    'Test voice': ["Tester la voix", "Probar la voz", "Prova la voce", "Stimme testen"],
     // ---- sidebar
     'Drag to resize': ['Glisser pour redimensionner', 'Arrastra para cambiar el tamaño', 'Trascina per ridimensionare', 'Ziehen zum Anpassen'],
     'Hide sidebar': ['Masquer la barre latérale', 'Ocultar la barra lateral', 'Nascondi la barra laterale', 'Seitenleiste ausblenden'],

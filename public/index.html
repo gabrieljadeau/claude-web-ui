@@ -46,6 +46,7 @@
   <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="9" r="2.2"/><path d="M6 7.2v9.6M18 11.2c0 3-3 4-6 4.4-2.5.3-5 1-6 3"/></symbol>
   <symbol id="i-thumbup" viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V10H19a2 2 0 012 2l-1.5 6a2 2 0 01-2 1.5H7"/></symbol>
   <symbol id="i-thumbdown" viewBox="0 0 24 24"><path d="M17 13V4h3v9zM17 13l-4 7c-1.5 0-2.5-1-2.5-2.5V14H5a2 2 0 01-2-2l1.5-6A2 2 0 016.5 4.5H17"/></symbol>
+  <symbol id="i-voice" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></symbol>
   <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></symbol>
   <symbol id="i-term" viewBox="0 0 24 24"><path d="M5 7l5 5-5 5M12 17h7"/></symbol>
   <symbol id="i-files" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M9 10v9"/></symbol>
@@ -416,6 +417,9 @@
       <div class="set-row"><div><b>Language</b><small>For dictation and read-aloud.</small></div><select id="setLang"><option value="fr-FR">Français</option><option value="es-ES">Español</option><option value="en-US">English</option></select></div>
       <div class="set-row"><div><b>Read replies aloud</b></div><label class="switch"><input type="checkbox" id="setSpeak"><span></span></label></div>
       <div class="set-row"><div><b>Hands-free conversation</b><small>After a pause your words are sent, the reply is read aloud, then the microphone listens again. Click the microphone to end.</small></div><label class="switch"><input type="checkbox" id="setHandsFree"><span></span></label></div>
+      <div class="set-row"><div><b>Voice</b><small>System voice used to read replies, for the language above.</small></div><select id="setVoice"></select></div>
+      <div class="set-row"><div><b>Speaking rate</b></div><input type="range" id="setRate" min="0.7" max="1.4" step="0.05" value="1"></div>
+      <div class="set-row"><div><b>Voice mode</b><small>Click the waveform in the message box to talk with Claude hands-free. Needs Google Chrome or Microsoft Edge.</small></div><button class="btn" id="setVoiceTest">Test voice</button></div>
     </div>
   </div>
 </dialog>
@@ -490,7 +494,17 @@
 <div id="toasts"></div>
 <div id="menu" class="menu" hidden></div>
 
+<!-- Voice mode: a spoken conversation; see public/voice.js -->
+<div id="voiceView" class="voice" hidden data-state="idle">
+  <div class="voice-top"><span class="voice-status" id="voiceStatus"></span><span class="spacer"></span><button class="ib" id="voiceText" title="Back to text"><svg><use href="#i-chat"/></svg></button><button class="ib" id="voiceClose" title="End voice mode"><svg><use href="#i-close"/></svg></button></div>
+  <div class="voice-mid"><button class="orb" id="voiceOrb" title="Tap to interrupt, or to send what you said"><span></span><span></span><span></span></button></div>
+  <div class="voice-reply" id="voiceReply"></div>
+  <div class="voice-transcript" id="voiceTranscript"></div>
+  <div class="voice-bottom"><button class="vbtn" id="voiceMute"><svg><use href="#i-mic"/></svg><span>Mute</span></button><button class="vbtn end" id="voiceEnd"><svg><use href="#i-close"/></svg><span>End</span></button></div>
+</div>
+
 <script src="/i18n.js"></script>
+<script src="/voice.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -59,6 +59,7 @@ const PROMPTS = {
   chat: 'This is a general conversation ("Chat"): you have no project folder. You can read files the user attaches and fetch web pages, nothing else. Do not try to run commands or edit files.',
   cowork: 'This is a "Cowork" task: the user gave you a folder to work in autonomously. Plan briefly, do the work, save results as files in that folder, and finish with a short summary of what you produced and where.',
   code: 'This is a "Code" session in a project folder, like the claude terminal command.',
+  voice: 'The user is talking to you by voice and hears your reply through a speech synthesizer. Answer as in a spoken conversation: a few short, natural sentences, in the language the user speaks. No markdown, no headings, no lists, no tables, no code blocks and no URLs (describe them in words instead). Give detail only when asked.',
   routine: 'This is a scheduled routine running without anyone watching. Do the task completely, do not ask questions, and finish with a concise report of what you did.',
   browser: 'You have a real web browser: the tools whose names start with mcp__browser__ (if they are listed as deferred, load them with ToolSearch first). The user watches that browser live in a panel next to the chat, so when you look something up on the web (a site, the weather, prices, news, documentation) prefer the browser tools over curl or WebFetch, so they can follow along. WebSearch is fine for finding where to look.',
 };
@@ -501,6 +502,7 @@ function queryOptions(rt, ac) {
   const append = [PROMPTS.common, PROMPTS[kind]];
   const browser = rt.browser && kind !== 'chat';
   if (browser) append.push(PROMPTS.browser);
+  if (rt.voice) append.push(PROMPTS.voice);
   const opts = {
     cwd: rt.cwd,
     resume: rt.sdkId || undefined,
@@ -1146,6 +1148,7 @@ wss.on('connection', async (ws) => {
           const files = Array.isArray(msg.files) ? msg.files.filter((f) => typeof f === 'string' && path.resolve(f).startsWith(UPLOAD_DIR)) : [];
           let text = msg.text.trim();
           if (!text && files.length) text = 'Please look at the attached files.';
+          rt.voice = !!msg.voice;   // spoken turn: the reply is written to be read aloud
           if (!text) break;
           if (msg.edit) {
             // Edit / retry: continue from a copy of the conversation cut just before the edited message.

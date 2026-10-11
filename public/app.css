@@ -500,10 +500,11 @@ pre:hover .copy-btn { opacity: 1; }
 .user-wrap { display: flex; flex-direction: column; align-items: flex-end; max-width: 85%; }
 .user-row .bubble { max-width: 100%; }
 .working .t { color: var(--muted); font-size: 12.5px; margin-left: 2px; }
-.working .dots { display: grid; grid-template-columns: 6px 6px; gap: 5px; width: 17px; height: 17px; flex: none; animation: dotsSpin 2.4s linear infinite; }
-.working .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.2s ease-in-out infinite; }
-.working .dots i:nth-child(2) { animation-delay: .3s; } .working .dots i:nth-child(4) { animation-delay: .6s; } .working .dots i:nth-child(3) { animation-delay: .9s; }
-@keyframes dotPulse { 0%, 100% { transform: scale(.7); opacity: .45; } 50% { transform: scale(1); opacity: 1; } }
+.working .wstar { width: 18px; height: 18px; flex: none; display: grid; place-items: center; animation: starPulse 1.8s ease-in-out infinite; }
+.working .wstar svg { width: 16px; height: 16px; stroke: none; fill: var(--accent); }
+@keyframes starPulse { 0%, 100% { transform: scale(.8) rotate(0deg); opacity: .5; } 50% { transform: scale(1.05) rotate(90deg); opacity: 1; } }
+.working .lbl { background: linear-gradient(90deg, var(--muted) 0%, var(--ink) 45%, var(--muted) 90%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 2.2s linear infinite; }
+@keyframes shimmer { from { background-position: 180% 0; } to { background-position: -180% 0; } }
 @keyframes dotsSpin { to { transform: rotate(360deg); } }
 .jump-btn { position: sticky; bottom: 10px; left: 50%; transform: translateX(-50%); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 50%; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; box-shadow: var(--shadow); }
 .jump-btn svg { width: 15px; height: 15px; }
