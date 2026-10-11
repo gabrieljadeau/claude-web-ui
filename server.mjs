@@ -18,6 +18,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import https from 'node:https';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket as WsClient } from 'ws';
 import { spawn } from 'node:child_process';
@@ -75,7 +76,9 @@ function browserServer() {
 }
 
 // ---- live browser (Chrome/Edge with a CDP port) ----
-const liveBrowser = { ready: false, proc: null, watchers: 0, cdp: null, target: null, lastFrame: null };
+// The same window is driven by Claude (through Playwright's MCP) and by the user (through the Browser pane:
+// tabs, address bar, clicks and keys are relayed over CDP).
+const liveBrowser = { ready: false, proc: null, watchers: 0, cdp: null, target: null, wanted: null, lastFrame: null, tabs: [], page: null, pending: new Map(), seq: 0 };
 function findBrowserExe() {
   const c = [process.env.CLAUDE_WEB_UI_BROWSER].filter(Boolean);
   if (IS_WIN) {
@@ -88,59 +91,248 @@ function findBrowserExe() {
 }
 function httpJson(url, timeout = 1500, method = 'GET') {
   return new Promise((resolve) => {
-    const req = http.request(url, { method, timeout }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(null); } }); });
+    const req = http.request(url, { method, timeout }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(b ? { text: b } : null); } }); });
     req.on('error', () => resolve(null)); req.on('timeout', () => { req.destroy(); resolve(null); }); req.end();
   });
 }
+const cdpUrl = (p) => `http://127.0.0.1:${CDP_PORT}/json${p}`;
 async function ensureLiveBrowser() {
   const ok = await launchLiveBrowser();
-  if (ok && liveBrowser.watchers) startScreencast(); // someone is already looking at the Browser panel
+  if (ok && liveBrowser.watchers) startScreencast(); // someone is already looking at the Browser pane
   return ok;
 }
 async function launchLiveBrowser() {
-  if (await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)) { liveBrowser.ready = true; return true; }
+  if (await httpJson(cdpUrl('/version'))) { liveBrowser.ready = true; return true; }
   const exe = findBrowserExe();
   if (!exe) { liveBrowser.ready = false; return false; }
   try {
-    const proc = spawn(exe, [`--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${BROWSER_PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-size=1280,900', '--disable-features=TranslateUI', 'about:blank'], { detached: !IS_WIN, stdio: 'ignore', windowsHide: false });
+    const proc = spawn(exe, [`--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${BROWSER_PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-size=1280,900',
+      '--disable-features=TranslateUI', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', 'about:blank'], { detached: !IS_WIN, stdio: 'ignore', windowsHide: false });
     proc.unref(); liveBrowser.proc = proc;
   } catch { liveBrowser.ready = false; return false; }
-  for (let i = 0; i < 40; i++) { await new Promise((r) => setTimeout(r, 250)); if (await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)) { liveBrowser.ready = true; return true; } }
+  for (let i = 0; i < 40; i++) { await new Promise((r) => setTimeout(r, 250)); if (await httpJson(cdpUrl('/version'))) { liveBrowser.ready = true; return true; } }
   liveBrowser.ready = false; return false;
+}
+const isRealPage = (t) => t.type === 'page' && !/^(devtools|chrome|chrome-extension):/.test(t.url || '');
+async function browserTabs() {
+  const list = await httpJson(cdpUrl('/list'));
+  if (!Array.isArray(list)) return null;
+  liveBrowser.tabs = list.filter(isRealPage).map((t) => ({ id: t.id, url: t.url, title: t.title, favicon: t.faviconUrl || '' }));
+  return liveBrowser.tabs;
+}
+function browserStateMsg(extra = {}) {
+  return { type: 'browserState', live: liveBrowser.ready, page: liveBrowser.page, tabs: liveBrowser.tabs, active: liveBrowser.target, ...extra };
 }
 // Streams the active page of the live browser as JPEG frames to every client that asked for it.
 let screencastTimer = null;
 async function screencastTick() {
   if (!liveBrowser.watchers) { stopScreencast(); return; }
-  const list = await httpJson(`http://127.0.0.1:${CDP_PORT}/json/list`);
-  const page = (list || []).find((t) => t.type === 'page' && !/^(devtools|chrome):/.test(t.url || ''));
+  const tabs = await browserTabs();
+  if (!tabs) { liveBrowser.ready = false; closeCdp(); broadcast(browserStateMsg()); return; }
+  liveBrowser.ready = true;
+  const page = tabs.find((t) => t.id === liveBrowser.wanted) || tabs.find((t) => t.id === liveBrowser.target) || tabs[0];
   if (!page) {
-    if (liveBrowser.cdp) { liveBrowser.cdp.close(); liveBrowser.cdp = null; liveBrowser.target = null; }
-    // Chrome may be running with no tab at all (Playwright closes its pages when a turn ends): open a blank one so there is something to stream.
-    if (list && Date.now() - (liveBrowser.lastNew || 0) > 10000) { liveBrowser.lastNew = Date.now(); await httpJson(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, 1500, 'PUT'); }
-    broadcast({ type: 'browserState', live: liveBrowser.ready, page: null }); return;
+    closeCdp();
+    // Chrome may be running with no tab at all (Playwright closes its pages when a turn ends): open a blank one so there is something to show.
+    if (Date.now() - (liveBrowser.lastNew || 0) > 10000) { liveBrowser.lastNew = Date.now(); await httpJson(cdpUrl('/new?about:blank'), 1500, 'PUT'); }
+    liveBrowser.page = null; broadcast(browserStateMsg()); return;
   }
-  if (liveBrowser.target === page.id && liveBrowser.cdp?.readyState === 1) { broadcast({ type: 'browserState', live: true, page: { url: page.url, title: page.title } }); return; }
-  if (liveBrowser.cdp) liveBrowser.cdp.close();
+  liveBrowser.page = { url: page.url, title: page.title };
+  if (liveBrowser.target === page.id && liveBrowser.cdp?.readyState === 1) { broadcast(browserStateMsg()); return; }
+  closeCdp();
   liveBrowser.target = page.id;
-  const ws = new WsClient(page.webSocketDebuggerUrl, { perMessageDeflate: false });
+  const raw = (await httpJson(cdpUrl('/list')))?.find?.((t) => t.id === page.id);
+  if (!raw?.webSocketDebuggerUrl) return;
+  const ws = new WsClient(raw.webSocketDebuggerUrl, { perMessageDeflate: false });
   liveBrowser.cdp = ws;
-  let id = 0; const call = (method, params = {}) => ws.send(JSON.stringify({ id: ++id, method, params }));
-  ws.on('open', () => { call('Page.enable'); call('Page.startScreencast', { format: 'jpeg', quality: 55, maxWidth: 1100, maxHeight: 900, everyNthFrame: 1 }); });
-  ws.on('message', (raw) => {
-    let m; try { m = JSON.parse(raw); } catch { return; }
+  ws.on('open', () => { cdpSend('Page.enable'); cdpSend('Page.startScreencast', { format: 'jpeg', quality: 60, maxWidth: 1280, maxHeight: 900, everyNthFrame: 1 }); });
+  ws.on('message', (data) => {
+    let m; try { m = JSON.parse(data); } catch { return; }
+    if (m.id && liveBrowser.pending.has(m.id)) { const p = liveBrowser.pending.get(m.id); liveBrowser.pending.delete(m.id); m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result); return; }
     if (m.method === 'Page.screencastFrame') {
-      call('Page.screencastFrameAck', { sessionId: m.params.sessionId });
+      cdpSend('Page.screencastFrameAck', { sessionId: m.params.sessionId }).catch(() => {});
       liveBrowser.lastFrame = m.params.data;
-      broadcast({ type: 'browserFrame', data: m.params.data, url: page.url, title: page.title, w: m.params.metadata?.deviceWidth, h: m.params.metadata?.deviceHeight });
+      const md = m.params.metadata || {};
+      broadcast({ type: 'browserFrame', data: m.params.data, url: liveBrowser.page?.url, title: liveBrowser.page?.title, w: md.deviceWidth, h: md.deviceHeight, id: page.id });
     }
   });
-  ws.on('close', () => { if (liveBrowser.cdp === ws) { liveBrowser.cdp = null; liveBrowser.target = null; } });
+  ws.on('close', () => { if (liveBrowser.cdp === ws) { liveBrowser.cdp = null; liveBrowser.target = null; } for (const p of liveBrowser.pending.values()) p.reject(new Error('closed')); liveBrowser.pending.clear(); });
   ws.on('error', () => {});
-  broadcast({ type: 'browserState', live: true, page: { url: page.url, title: page.title } });
+  broadcast(browserStateMsg());
 }
-function startScreencast() { if (!screencastTimer) { screencastTimer = setInterval(screencastTick, 1500); screencastTick(); } }
-function stopScreencast() { clearInterval(screencastTimer); screencastTimer = null; if (liveBrowser.cdp) { liveBrowser.cdp.close(); liveBrowser.cdp = null; liveBrowser.target = null; } }
+function closeCdp() { if (liveBrowser.cdp) { try { liveBrowser.cdp.close(); } catch { /* ignore */ } } liveBrowser.cdp = null; liveBrowser.target = null; }
+function cdpSend(method, params = {}) {
+  return new Promise((resolve, reject) => {
+    const ws = liveBrowser.cdp; if (!ws || ws.readyState !== 1) return reject(new Error('No page is open.'));
+    const id = ++liveBrowser.seq; liveBrowser.pending.set(id, { resolve, reject });
+    ws.send(JSON.stringify({ id, method, params }));
+    setTimeout(() => { if (liveBrowser.pending.has(id)) { liveBrowser.pending.delete(id); reject(new Error('timeout')); } }, 10000);
+  });
+}
+function startScreencast() { if (!screencastTimer) { screencastTimer = setInterval(screencastTick, 1200); screencastTick(); } }
+function stopScreencast() { clearInterval(screencastTimer); screencastTimer = null; closeCdp(); }
+// Tabs, address bar and history, driven from the Browser pane.
+async function browserAction(msg) {
+  if (!liveBrowser.ready && !(await ensureLiveBrowser())) throw new Error('No Chrome or Edge found on this computer. Set CLAUDE_WEB_UI_BROWSER to the path of one.');
+  const a = msg.action;
+  if (a === 'newTab' || (a === 'navigate' && !liveBrowser.cdp)) {
+    const t = await httpJson(cdpUrl('/new?' + (a === 'navigate' ? normalizeUrl(msg.url) : 'about:blank')), 2000, 'PUT');
+    if (t?.id) { liveBrowser.wanted = t.id; liveBrowser.target = null; }
+  } else if (a === 'selectTab') { liveBrowser.wanted = msg.id; liveBrowser.target = null; await httpJson(cdpUrl('/activate/' + msg.id), 1500); }
+  else if (a === 'closeTab') { await httpJson(cdpUrl('/close/' + msg.id), 1500); if (liveBrowser.wanted === msg.id) liveBrowser.wanted = null; }
+  else if (a === 'navigate') { liveBrowser.wanted = liveBrowser.target; await cdpSend('Page.navigate', { url: normalizeUrl(msg.url) }); }
+  else if (a === 'reload') await cdpSend('Page.reload', {});
+  else if (a === 'back' || a === 'forward') {
+    const h = await cdpSend('Page.getNavigationHistory'); const i = h.currentIndex + (a === 'back' ? -1 : 1);
+    if (h.entries[i]) await cdpSend('Page.navigateToHistoryEntry', { entryId: h.entries[i].id });
+  }
+  else if (a === 'follow') liveBrowser.wanted = null; // follow whatever page Claude works on
+  if (liveBrowser.watchers) { startScreencast(); setTimeout(screencastTick, 150); }
+}
+function normalizeUrl(u) {
+  u = String(u || '').trim(); if (!u) return 'about:blank';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return u;
+  if (/^localhost(:\d+)?([/?#]|$)/.test(u) || /^(\d{1,3}\.){3}\d{1,3}/.test(u) || /^[\w-]+(\.[\w-]+)+/.test(u)) return 'http' + (/^localhost|^(\d{1,3}\.){3}\d{1,3}/.test(u) ? '' : 's') + '://' + u;
+  return 'https://www.google.com/search?q=' + encodeURIComponent(u);
+}
+// Mouse, wheel and keyboard from the Browser pane, in CSS pixels of the streamed page.
+const MODS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+async function browserInput(m) {
+  const mods = (m.alt ? 1 : 0) | (m.ctrl ? 2 : 0) | (m.meta ? 4 : 0) | (m.shift ? 8 : 0);
+  if (m.kind === 'mouse') {
+    const btn = ['left', 'middle', 'right'][m.button] || 'none';
+    await cdpSend('Input.dispatchMouseEvent', { type: m.event, x: m.x, y: m.y, button: m.event === 'mouseMoved' ? (m.buttons ? btn : 'none') : btn, buttons: m.buttons || 0, clickCount: m.clicks || 0, modifiers: mods });
+  } else if (m.kind === 'wheel') {
+    await cdpSend('Input.dispatchMouseEvent', { type: 'mouseWheel', x: m.x, y: m.y, deltaX: m.dx, deltaY: m.dy, modifiers: mods });
+  } else if (m.kind === 'key') {
+    const printable = m.key?.length === 1 && !m.ctrl && !m.meta;
+    const base = { key: m.key, code: m.code, windowsVirtualKeyCode: m.keyCode, nativeVirtualKeyCode: m.keyCode, modifiers: mods, autoRepeat: !!m.repeat };
+    if (m.event === 'keydown') { await cdpSend('Input.dispatchKeyEvent', { ...base, type: printable ? 'keyDown' : 'rawKeyDown', text: printable ? m.key : (m.key === 'Enter' ? '\r' : undefined), unmodifiedText: printable ? m.key : undefined }); }
+    else await cdpSend('Input.dispatchKeyEvent', { ...base, type: 'keyUp' });
+  } else if (m.kind === 'text') await cdpSend('Input.insertText', { text: String(m.text || '') });
+}
+
+// ---- dev servers from .claude/launch.json (the "play" buttons of the Browser pane) ----
+const devServers = new Map(); // key cwd + name -> { proc, name, cwd, port, url, logs, status }
+const devKey = (cwd, name) => cwd + '\n' + name;
+async function readLaunchConfig(cwd) {
+  try {
+    const j = JSON.parse(await fsp.readFile(path.join(cwd, '.claude', 'launch.json'), 'utf8'));
+    return (j.configurations || []).filter((c) => c && c.name).map((c) => ({ name: String(c.name), port: c.port ? Number(c.port) : null, url: c.url || '', command: c.runtimeExecutable ? [c.runtimeExecutable, ...(c.runtimeArgs || [])].join(' ') : '', autoPort: !!c.autoPort }));
+  } catch { return []; }
+}
+async function launchList(cwd) {
+  const items = await readLaunchConfig(cwd);
+  for (const it of items) { const s = devServers.get(devKey(cwd, it.name)); it.status = s?.status || 'stopped'; it.liveUrl = s?.url || ''; it.livePort = s?.port || null; }
+  return items;
+}
+const portFree = (port) => new Promise((resolve) => { const srv = net.createServer(); srv.once('error', () => resolve(false)); srv.listen(port, '127.0.0.1', () => srv.close(() => resolve(true))); });
+const portOpen = (port) => new Promise((resolve) => { const s = net.connect({ port, host: '127.0.0.1' }); s.once('connect', () => { s.destroy(); resolve(true); }); s.once('error', () => resolve(false)); s.setTimeout(800, () => { s.destroy(); resolve(false); }); });
+async function freePort(from) { for (let p = from; p < from + 50; p++) if (await portFree(p)) return p; return from; }
+function devLog(s, line) { s.logs.push(line); if (s.logs.length > 400) s.logs.splice(0, s.logs.length - 400); broadcast({ type: 'launchLog', cwd: s.cwd, name: s.name, line }); }
+function devBroadcast(cwd) { launchList(cwd).then((items) => broadcast({ type: 'launchList', cwd, items })); }
+async function launchStart(cwd, name) {
+  const cfg = (await readLaunchConfig(cwd)).find((c) => c.name === name);
+  if (!cfg) throw new Error(`No configuration "${name}" in .claude/launch.json`);
+  const key = devKey(cwd, name); const old = devServers.get(key);
+  if (old?.status === 'running' || old?.status === 'starting') { if (old.url) await openInBrowser(old.url); return; }
+  const raw = JSON.parse(await fsp.readFile(path.join(cwd, '.claude', 'launch.json'), 'utf8')).configurations.find((c) => c.name === name);
+  let port = cfg.port;
+  if (port && !(await portFree(port))) {
+    if (cfg.autoPort) port = await freePort(port + 1);
+    else if (await portOpen(port)) { // something already listens there: just show it
+      const url = cfg.url || `http://localhost:${port}`; devServers.set(key, { name, cwd, port, url, logs: [`Port ${port} is already in use; showing what runs there.`], status: 'running', proc: null, attached: true }); devBroadcast(cwd); await openInBrowser(url); return;
+    }
+  }
+  const s = { name, cwd, port, url: cfg.url || (port ? `http://localhost:${port}` : ''), logs: [], status: 'starting', proc: null };
+  devServers.set(key, s); devBroadcast(cwd);
+  if (!raw.runtimeExecutable) { s.status = 'running'; devBroadcast(cwd); if (s.url) await openInBrowser(s.url); return; }
+  const env = { ...process.env, ...(raw.env || {}) }; if (port && port !== cfg.port) env.PORT = String(port);
+  devLog(s, `$ ${[raw.runtimeExecutable, ...(raw.runtimeArgs || [])].join(' ')}${port && port !== cfg.port ? `   (PORT=${port})` : ''}`);
+  let proc;
+  try { proc = spawn(raw.runtimeExecutable, raw.runtimeArgs || [], { cwd, env, shell: IS_WIN, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
+  catch (err) { s.status = 'error'; devLog(s, String(err.message || err)); devBroadcast(cwd); return; }
+  s.proc = proc;
+  const onData = (d) => { for (const line of String(d).split(/\r?\n/)) if (line) devLog(s, line); };
+  proc.stdout.on('data', onData); proc.stderr.on('data', onData);
+  proc.on('error', (err) => { s.status = 'error'; devLog(s, String(err.message || err)); devBroadcast(cwd); });
+  proc.on('exit', (code) => { if (s.proc === proc) { s.status = code ? 'error' : 'stopped'; s.proc = null; devLog(s, `Process exited (${code ?? 'killed'}).`); devBroadcast(cwd); } });
+  if (port) {
+    for (let i = 0; i < 120 && s.proc === proc && s.status === 'starting'; i++) { await new Promise((r) => setTimeout(r, 500)); if (await portOpen(port)) break; }
+    if (s.proc !== proc || s.status !== 'starting') return;
+  } else await new Promise((r) => setTimeout(r, 1500));
+  s.status = 'running'; devBroadcast(cwd);
+  if (s.url) await openInBrowser(s.url);
+}
+async function launchStop(cwd, name) {
+  const s = devServers.get(devKey(cwd, name)); if (!s) return;
+  if (s.proc) { try { if (IS_WIN) spawn('taskkill', ['/pid', String(s.proc.pid), '/T', '/F'], { windowsHide: true }); else s.proc.kill('SIGTERM'); } catch { /* ignore */ } }
+  s.status = 'stopped'; s.proc = null; devBroadcast(cwd);
+}
+async function openInBrowser(url) {
+  if (!liveBrowser.ready && !(await ensureLiveBrowser())) { openBrowser(url); return; }
+  const tabs = (await browserTabs()) || [];
+  const same = tabs.find((t) => t.url === url || t.url === url + '/');
+  if (same) { liveBrowser.wanted = same.id; liveBrowser.target = null; await httpJson(cdpUrl('/activate/' + same.id), 1500); }
+  else { const t = await httpJson(cdpUrl('/new?' + url), 2000, 'PUT'); if (t?.id) { liveBrowser.wanted = t.id; liveBrowser.target = null; } }
+  if (liveBrowser.watchers) { startScreencast(); setTimeout(screencastTick, 200); }
+}
+
+// ---- files pane ----
+const SKIP_DIRS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', '.cache', '__pycache__', '.venv', 'venv', 'target', '.playwright-mcp']);
+async function fsList(dir) {
+  const abs = path.resolve(dir);
+  if (!isAllowedFile(abs)) throw new Error('Not allowed');
+  const ents = await fsp.readdir(abs, { withFileTypes: true });
+  const items = ents.filter((e) => e.name !== '.git' && e.name !== '.DS_Store').map((e) => ({ name: e.name, dir: e.isDirectory(), path: path.join(abs, e.name) }));
+  items.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) : a.dir ? -1 : 1));
+  return items;
+}
+async function fsSearch(root, q, content) {
+  root = path.resolve(root); if (!isAllowedFile(root)) throw new Error('Not allowed');
+  const needle = String(q || '').toLowerCase(); const out = []; let seen = 0;
+  const walk = async (dir, depth) => {
+    if (out.length >= 100 || seen > 20000 || depth > 12) return;
+    let ents; try { ents = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      if (out.length >= 100) return; seen++;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) await walk(p, depth + 1); continue; }
+      if (!e.isFile()) continue;
+      if (!content) { if (e.name.toLowerCase().includes(needle)) out.push({ path: p, name: e.name, rel: path.relative(root, p) }); continue; }
+      try {
+        const st = await fsp.stat(p); if (st.size > 600 * 1024) continue;
+        const buf = await fsp.readFile(p); if (buf.subarray(0, 1024).includes(0)) continue;
+        const lines = buf.toString('utf8').split('\n');
+        for (let i = 0; i < lines.length && out.length < 100; i++) if (lines[i].toLowerCase().includes(needle)) out.push({ path: p, name: e.name, rel: path.relative(root, p), line: i + 1, text: lines[i].trim().slice(0, 160) });
+      } catch { /* skip */ }
+    }
+  };
+  await walk(root, 0);
+  return out;
+}
+
+// ---- terminal pane: one shell per session, no pty (plain pipes), commands end with a marker so the pane knows when to show the prompt again ----
+const TERM_MARK = '\u001e';
+function termOpen(rt) {
+  if (rt.term?.proc && rt.term.proc.exitCode === null) return rt.term;
+  const shell = IS_WIN ? (process.env.ComSpec || 'cmd.exe') : (process.env.SHELL || '/bin/bash');
+  const args = IS_WIN ? ['/Q', '/K', 'prompt $_'] : [];
+  const proc = spawn(shell, args, { cwd: rt.cwd, env: { ...process.env, TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', CLICOLOR: '0', NO_COLOR: '1', PS1: '' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const t = { proc, shell: path.basename(shell), cwd: rt.cwd };
+  rt.term = t;
+  const out = (d) => broadcast({ type: 'termOut', sid: rt.localId, data: String(d) });
+  proc.stdout.on('data', out); proc.stderr.on('data', out);
+  proc.on('exit', (code) => { if (rt.term === t) { broadcast({ type: 'termOut', sid: rt.localId, data: `\n[shell exited${code ? ' with code ' + code : ''}]\n` }); rt.term = null; } });
+  proc.on('error', (err) => broadcast({ type: 'termOut', sid: rt.localId, data: `\n[${err.message}]\n` }));
+  return t;
+}
+function termRun(rt, cmd) {
+  const t = termOpen(rt); if (!t?.proc?.stdin?.writable) return;
+  const line = IS_WIN ? `${cmd}\r\necho ${TERM_MARK}%CD%${TERM_MARK}\r\n` : `${cmd}\nprintf '${TERM_MARK}%s${TERM_MARK}\\n' "$PWD"\n`;
+  t.proc.stdin.write(line);
+}
+function termKill(rt) { const t = rt.term; if (!t?.proc) return; rt.term = null; try { if (IS_WIN) spawn('taskkill', ['/pid', String(t.proc.pid), '/T', '/F'], { windowsHide: true }); else t.proc.kill('SIGKILL'); } catch { /* ignore */ } }
 
 // ------------------------------------------------------- persistent state
 const state = loadState();
@@ -241,7 +433,7 @@ function emit(rt, ev) {
     case 'thinking': rt.liveThinking = ''; rt.items.push({ type: 'thinking', text: ev.text }); break;
     case 'delta': rt.liveText += ev.text; break;
     case 'assistantText': rt.liveText = ''; rt.items.push({ type: 'assistant', text: ev.text }); break;
-    case 'toolUse': if (!ev.parent) rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false, parent: ev.parent || null }); break;
+    case 'toolUse': if (String(ev.name).startsWith('mcp__browser__')) liveBrowser.wanted = null; if (!ev.parent) rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false, parent: ev.parent || null }); break;
     case 'subText': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.parent); if (t) t.subText = (t.subText ? t.subText + '\n' : '') + ev.text; break; }
     case 'toolResult': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.id); if (t) { t.result = ev.content; t.isError = ev.isError; if (ev.images?.length) t.images = ev.images; } break; }
     case 'permission': rt.items.push({ type: 'perm', id: ev.id, tool: ev.tool, input: ev.input, answer: null }); break;
@@ -953,7 +1145,7 @@ wss.on('connection', async (ws) => {
         }
         case 'delete': {
           const sdkId = rt?.sdkId || msg.sid;
-          if (rt) { denyAllPending(rt, 'Deleted.'); rt.abort?.abort(); runtimes.delete(rt.localId); if (rt.sdkId) bySdk.delete(rt.sdkId); }
+          if (rt) { denyAllPending(rt, 'Deleted.'); termKill(rt); rt.abort?.abort(); runtimes.delete(rt.localId); if (rt.sdkId) bySdk.delete(rt.sdkId); }
           if (sdkId) { await deleteSession(sdkId, rt?.cwd ? { dir: rt.cwd } : undefined).catch(() => {}); delete state.meta[sdkId]; saveState(); }
           invalidateListing(); sidebarDirty();
           break;
@@ -1082,11 +1274,31 @@ wss.on('connection', async (ws) => {
         case 'browserWatch': {
           const was = ws.watching; ws.watching = !!msg.on;
           liveBrowser.watchers += (ws.watching ? 1 : 0) - (was ? 1 : 0);
-          // "lazy": show the panel without launching a browser; it starts streaming once Claude's next turn opens one.
-          if (ws.watching) { if (!liveBrowser.ready && !msg.lazy) await ensureLiveBrowser(); if (!liveBrowser.ready && msg.lazy) liveBrowser.ready = !!(await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)); send({ type: 'browserState', live: liveBrowser.ready, lazy: !!msg.lazy, page: null, frame: liveBrowser.lastFrame }); if (liveBrowser.ready) startScreencast(); }
-          else if (liveBrowser.watchers <= 0) { liveBrowser.watchers = 0; stopScreencast(); }
+          // "lazy": show the pane without launching a browser; it starts streaming once a page is opened (by Claude or from the pane).
+          if (ws.watching) {
+            if (!liveBrowser.ready && !msg.lazy) await ensureLiveBrowser();
+            if (!liveBrowser.ready && msg.lazy) liveBrowser.ready = !!(await httpJson(cdpUrl('/version')));
+            if (liveBrowser.ready) await browserTabs();
+            send(browserStateMsg({ lazy: !!msg.lazy, frame: liveBrowser.lastFrame }));
+            if (liveBrowser.ready) startScreencast();
+          } else if (liveBrowser.watchers <= 0) { liveBrowser.watchers = 0; stopScreencast(); }
           break;
         }
+        case 'browserAction': await browserAction(msg); break;
+        case 'browserInput': try { await browserInput(msg); } catch { /* page gone */ } break;
+        // ---- dev servers (.claude/launch.json)
+        case 'launchList': { const cwd = rt?.cwd || safeDir(msg.cwd); if (cwd) send({ type: 'launchList', cwd, items: await launchList(cwd) }); break; }
+        case 'launchStart': { const cwd = rt?.cwd || safeDir(msg.cwd); if (cwd) launchStart(cwd, msg.name).catch((err) => send({ type: 'error', message: String(err.message || err) })); break; }
+        case 'launchStop': { const cwd = rt?.cwd || safeDir(msg.cwd); if (cwd) await launchStop(cwd, msg.name); break; }
+        case 'launchLogs': { const cwd = rt?.cwd || safeDir(msg.cwd); const s = cwd && devServers.get(devKey(cwd, msg.name)); send({ type: 'launchLogs', cwd, name: msg.name, lines: s?.logs || [] }); break; }
+        case 'openUrl': openBrowser(String(msg.url || '')); break;
+        // ---- files pane
+        case 'fsList': send({ type: 'fsList', ref: msg.ref, path: path.resolve(msg.path), items: await fsList(msg.path) }); break;
+        case 'fsSearch': send({ type: 'fsSearch', ref: msg.ref, items: await fsSearch(msg.root, msg.q, !!msg.content) }); break;
+        // ---- terminal pane
+        case 'termOpen': if (rt) { const t = termOpen(rt); send({ type: 'termOpened', sid: rt.localId, shell: t.shell, cwd: rt.cwd }); } break;
+        case 'termRun': if (rt && typeof msg.cmd === 'string') termRun(rt, msg.cmd); break;
+        case 'termKill': if (rt) { termKill(rt); const t = termOpen(rt); send({ type: 'termOpened', sid: rt.localId, shell: t.shell, cwd: rt.cwd, restarted: true }); } break;
         case 'authCheck': send({ type: 'auth', auth: await checkAuth() }); break;
         case 'authLogin': openLoginTerminal(); break;
         case 'authTest': {

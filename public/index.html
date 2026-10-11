@@ -51,30 +51,31 @@
   <div class="sb-top">
     <button class="ib" id="collapseBtn" title="Hide sidebar"><svg><use href="#i-panel"/></svg></button>
     <div class="brand" id="brand">Claude</div>
-    <div class="seg" id="tabs" title="Chat · Cowork · Code">
-      <button data-tab="chat" title="Chat"><svg><use href="#i-chat"/></svg></button>
-      <button data-tab="cowork" title="Cowork"><svg><use href="#i-cowork"/></svg></button>
+    <div class="seg" id="tabs" title="Chat and Cowork · Code">
+      <button data-tab="chat" title="Chat and Cowork"><svg><use href="#i-chat"/></svg></button>
       <button data-tab="code" title="Code"><svg><use href="#i-code"/></svg></button>
     </div>
   </div>
-  <button class="sb-search" id="searchBtn"><svg><use href="#i-search"/></svg><span>Search</span><kbd>⌘K</kbd></button>
   <nav class="sb-nav">
-    <button id="newBtn"><svg><use href="#i-plus"/></svg><span id="newLabel">New</span></button>
-    <button id="navDashboard"><svg><use href="#i-dash"/></svg><span>Dashboard</span></button>
+    <button id="newBtn"><span class="nplus"><svg><use href="#i-plus"/></svg></span><span id="newLabel">New</span></button>
     <button id="navProjects"><svg><use href="#i-folder"/></svg><span>Projects</span></button>
-    <button id="navRoutines"><svg><use href="#i-clock"/></svg><span>Routines</span></button>
+    <button id="navRoutines"><svg><use href="#i-clock"/></svg><span>Scheduled</span></button>
     <button id="navCustomize"><svg><use href="#i-box"/></svg><span>Customize</span></button>
+    <button id="navMore" class="more-nav"><svg class="chev"><use href="#i-chev"/></svg><span>More</span></button>
+    <div id="moreNav" hidden>
+      <button id="navDashboard"><svg><use href="#i-dash"/></svg><span>Dashboard</span></button>
+    </div>
   </nav>
-  <div class="sec-head"><span id="recentsLabel">Recents</span><button class="ib sm" id="refreshBtn" title="Refresh"><svg><use href="#i-clock"/></svg></button></div>
   <div class="sb-list" id="list"></div>
   <div class="sb-foot">
-    <button class="user" id="userBtn">
+    <button class="user" id="userBtn" title="Account and settings">
       <span class="avatar" id="avatar">G</span>
-      <span class="u-text"><span id="userName">…</span><small id="authLabel">Checking connection…</small></span>
+      <span class="u-text"><span id="userName">…</span><small id="authLabel">·</small></span>
       <span class="dot" id="authDot"></span>
+      <svg class="chev"><use href="#i-chev"/></svg>
     </button>
     <button class="ib" id="reportBtn" title="Request a fix or a feature"><svg><use href="#i-life"/></svg></button>
-    <button class="ib" id="settingsBtn" title="Settings"><svg><use href="#i-gear"/></svg></button>
+    <button class="ib" id="searchBtn" title="Search (⌘K)"><svg><use href="#i-search"/></svg></button>
   </div>
 </aside>
 
@@ -87,47 +88,49 @@
       <h1><svg class="star"><use href="#i-star"/></svg><span id="welcomeTitle">Welcome</span></h1>
       <div class="composer-box" id="welcomeComposer"></div>
       <div hidden id="welcomeChips">
+        <div class="seg kind-seg" id="kindSeg"><button data-k="chat">Chat</button><button data-k="cowork">Cowork</button></div>
         <button class="chip" id="projectChip"><svg><use href="#i-folder"/></svg><span id="projectChipText">Project</span><svg><use href="#i-chev"/></svg></button>
-        <button class="chip ghost" id="modeChip"><span id="modeChipText">Ask</span></button>
-        <button class="chip ghost" id="modelChip"><span id="modelChipText">Default model</span></button>
-        <button class="chip ghost" id="effortChip"><span id="effortChipText">Default effort</span></button>
+        <button class="mbtn" id="modelChip"><span id="modelChipText">Default model</span><small id="effortChipText"></small></button>
       </div>
-      <div class="jump" id="jump"></div>
+      <div class="suggest" id="suggest"></div>
     </div>
   </section>
 
   <!-- Session -->
   <section id="viewSession" class="view" hidden>
     <header class="s-head">
-      <span class="kind" id="sKind">Code</span>
-      <div class="s-title-wrap"><input id="sTitle" class="s-title" placeholder="Untitled" spellcheck="false"><span class="s-path" id="sPath" hidden><svg><use href="#i-folder"/></svg><span></span></span></div>
+      <svg class="s-kind-ic" id="sKindIcon"><use href="#i-chat"/></svg>
+      <button class="s-title-btn" id="sTitleBtn" title="Conversation options"><span id="sTitle">Untitled</span><svg class="chev"><use href="#i-chev"/></svg></button>
+      <span class="s-path" id="sPath" hidden><svg><use href="#i-folder"/></svg><span></span></span>
+      <span class="spacer"></span>
+      <span class="ctx" id="sCtx" title="Context window used" hidden><span class="bar"><i></i></span><span class="pct"></span></span>
+      <span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span>
       <button class="ib" id="browserBtn" title="Browser view (what Claude sees)"><svg><use href="#i-globe"/></svg></button>
-      <button class="ib" id="sPin" title="Pin"><svg><use href="#i-pin"/></svg></button>
       <button class="ib" id="panelBtn" title="Progress panel"><svg><use href="#i-panel" style="transform:scale(-1,1);transform-origin:center"/></svg></button>
-      <button class="ib" id="sMore" title="More"><svg><use href="#i-more"/></svg></button>
     </header>
     <div class="s-body">
       <div class="s-col">
-        <div id="chat"><div class="wrap" id="log"></div><button class="jump-btn" id="jumpBtn" hidden>Jump to bottom ↓</button></div>
+        <div id="chat"><div class="wrap" id="log"></div><button class="jump-btn" id="jumpBtn" title="Jump to latest" hidden><svg><use href="#i-up" style="transform:rotate(180deg);transform-origin:center"/></svg></button></div>
         <div class="composer"><div class="wrap">
           <div class="queue" id="queue"></div>
           <div class="edit-hint" id="editHint" hidden><span></span><button class="btn link">Cancel (Esc)</button></div>
           <div class="composer-box" id="sessionComposer"></div>
-          <div hidden id="sessionChips">
-            <button class="chip ghost" id="sModeChip"><span></span></button>
-            <button class="chip ghost" id="sBrowserChip"><span></span></button>
-            <button class="chip ghost" id="sModelChip"><span></span></button>
-            <button class="chip ghost" id="sEffortChip"><span></span></button>
+          <div class="cfoot">
+            <span class="cfoot-l"><button class="fbtn" id="sModeChip"><span></span></button><button class="fbtn" id="sBrowserChip"><span></span></button></span>
+            <span class="cfoot-c">Claude is AI and can make mistakes. Please double-check responses.</span>
+            <span class="cfoot-r"><button class="fbtn" id="sModelChip"><span></span><small id="sEffortText"></small></button></span>
           </div></div></div>
       </div>
       <aside class="panel-side" id="panel">
-        <div class="sec" id="browserSec" hidden><div class="sec-t">Browser <span class="sub" id="browserTitle"></span><span class="spacer"></span><button class="ib sm" id="browserClose" title="Hide">✕</button></div>
-          <div class="bview" id="browserView"><img id="browserImg" alt=""><div class="bnote" id="browserNote">Opening the browser…</div></div></div>
-        <div class="sec"><div class="sec-t">Progress <span class="sub" id="progressLabel"></span></div><div id="progressBody"></div></div>
-        <div class="sec"><div class="sec-t">Outputs <span class="sub" id="outCount"></span></div><div id="outputs"></div></div>
-        <div class="sec"><div class="sec-t">Steps <span class="sub" id="stepCount"></span></div><div class="acts" id="acts"></div></div>
-        <div class="sec"><div class="sec-t">Used in this chat</div><div class="used" id="used"></div></div>
-        <div class="sec" id="usageSec" hidden><div class="sec-t">Usage</div><div class="usage-row"><span class="ctx" id="sCtx" title="Context window used" hidden><span class="bar"><i></i></span><span class="pct"></span></span><span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span></div></div>
+        <div class="pcard">
+        <details class="sec" id="browserSec" open hidden><summary class="sec-t">Browser <span class="sub" id="browserTitle"></span><span class="spacer"></span><button class="ib sm" id="browserClose" title="Hide">✕</button></summary>
+          <div class="bview" id="browserView"><img id="browserImg" alt=""><div class="bnote" id="browserNote">Opening the browser…</div></div></details>
+        <details class="sec" open><summary class="sec-t">Progress <span class="sub" id="progressLabel"></span></summary><div id="progressBody"></div></details>
+        <details class="sec" open><summary class="sec-t">Outputs <span class="sub" id="outCount"></span></summary><div id="outputs"></div></details>
+        <details class="sec" open><summary class="sec-t">Context</summary><div id="contextBody"></div></details>
+        <details class="sec"><summary class="sec-t">Steps <span class="sub" id="stepCount"></span></summary><div class="acts" id="acts"></div></details>
+        <div hidden><div id="used"></div></div>
+        </div>
       </aside>
     </div>
   </section>

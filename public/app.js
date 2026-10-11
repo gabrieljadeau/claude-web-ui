@@ -104,21 +104,22 @@
   $('connectSkip').onclick = () => { S.connectSkipped = true; $('connect').hidden = true; };
 
   // ------------------------------------------------------------- sidebar
+  // Two spaces like claude.ai: "Chat and Cowork" (S.tab chat|cowork, chosen in the composer) and "Code".
+  const space = () => (S.tab === 'code' ? 'code' : 'chat');
   function setTab(tab) {
     S.tab = tab; store.set('tab', tab);
-    document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-    $('brand').textContent = tab === 'chat' ? 'Claude' : tab === 'cowork' ? 'Claude Cowork' : 'Claude Code';
-    $('navProjects').hidden = tab === 'chat';
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === space()));
     renderList();
     if (S.view === 'welcome') showWelcome();
   }
-  document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+  document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => setTab(b.dataset.tab === 'code' ? 'code' : (store.get('chatKind', 'chat')))));
   $('newBtn').onclick = () => showWelcome();
   $('navDashboard').onclick = () => showDashboard();
   $('navProjects').onclick = () => showProjects();
   $('navRoutines').onclick = () => showRoutines();
   $('navCustomize').onclick = () => showCustomize();
-  $('refreshBtn').onclick = () => send({ type: 'sessions' });
+  $('navMore').onclick = () => { const open = $('moreNav').hidden; $('moreNav').hidden = !open; $('navMore').classList.toggle('open', open); store.set('moreNav', open); };
+  if (store.get('moreNav', false)) { $('moreNav').hidden = false; $('navMore').classList.add('open'); }
   // resizable sidebar: drag the right edge; the width is remembered per browser
   const SIDE_MIN = 180, SIDE_MAX = 520;
   const setSideW = (w) => document.documentElement.style.setProperty('--side-w', Math.max(SIDE_MIN, Math.min(SIDE_MAX, w)) + 'px');
@@ -138,23 +139,45 @@
     document.querySelectorAll('.sb-nav button').forEach((b) => b.classList.toggle('active', b.id === map[S.view]));
   }
 
-  // Each tab lists strictly its own kind: chats, cowork tasks, or code sessions.
-  const visibleSessions = (kind) => S.sessions.filter((s) => (S.showArchived || !s.archived) && s.kind === kind);
+  // The chat space lists chats and cowork tasks together ("Chats and tasks"); Code lists sessions by project.
+  const visibleSessions = (kind) => S.sessions.filter((s) => (S.showArchived || !s.archived) && (kind === 'chat' ? s.kind === 'chat' || s.kind === 'cowork' : s.kind === kind));
   function renderList() {
     const box = $('list'); box.innerHTML = '';
-    const items = visibleSessions(S.tab);
-    $('recentsLabel').textContent = S.tab === 'chat' ? 'Recents' : S.tab === 'cowork' ? 'Tasks' : 'Sessions';
-    if (S.tab === 'chat') {
-      if (!items.length) { box.innerHTML = '<div class="empty-list">Chats you start will show up here</div>'; return; }
-      for (const [label, list] of byDate(items)) box.appendChild(group(label, list, null));
+    const items = visibleSessions(space());
+    const section = (title, extra) => { const h = el('div', 'sec-head'); h.appendChild(el('span', null, title)); if (extra) h.appendChild(extra); box.appendChild(h); };
+    if (space() === 'chat') {
+      // Scheduled: routines, with a badge for runs not yet opened
+      const routines = S.routines.filter((r) => r.enabled || S.sessions.some((s) => s.routineId === r.id));
+      if (routines.length) {
+        section('Scheduled');
+        for (const r of routines.slice(0, 6)) box.appendChild(routineRow(r));
+      }
+      const pinned = items.filter((s) => s.pinned);
+      if (pinned.length) { section('Pinned'); for (const s of pinned.sort((a, b) => b.when - a.when)) box.appendChild(sessionRow(s)); }
+      const rest = items.filter((s) => !s.pinned).sort((a, b) => b.when - a.when);
+      const filter = el('button', 'ib sm'); filter.title = 'Refresh'; filter.innerHTML = icon('filter'); filter.onclick = () => send({ type: 'sessions' });
+      section('Chats and tasks', filter);
+      if (!rest.length && !pinned.length) { box.appendChild(el('div', 'empty-list', 'Chats and tasks you start will show up here')); return; }
+      for (const s of rest) box.appendChild(sessionRow(s));
       return;
     }
     const groups = new Map();
-    if (S.tab === 'code') for (const p of S.projects) groups.set(p.path, { name: p.name, path: p.path, items: [] });
+    for (const p of S.projects) groups.set(p.path, { name: p.name, path: p.path, items: [] });
     for (const s of items) { const k = s.cwd || '?'; if (!groups.has(k)) groups.set(k, { name: folderName(s.cwd), path: s.cwd || '', items: [] }); groups.get(k).items.push(s); }
     const arr = [...groups.values()].sort((a, b) => (latest(b) - latest(a)) || a.name.localeCompare(b.name));
-    if (!arr.length) { box.innerHTML = `<div class="empty-list">${S.tab === 'cowork' ? 'Tasks you start will show up here' : 'Sessions you start will show up here'}</div>`; return; }
+    section('Sessions');
+    if (!arr.length) { box.appendChild(el('div', 'empty-list', 'Sessions you start will show up here')); return; }
     for (const g of arr) box.appendChild(group(g.name, g.items, g.path));
+  }
+  function routineRow(r) {
+    const b = el('div', 'row rt'); b.tabIndex = 0; b.setAttribute('role', 'button');
+    const fresh = S.sessions.filter((s) => s.routineId === r.id && s.unread).length;
+    const running = S.sessions.some((s) => s.routineId === r.id && s.status !== 'idle');
+    b.innerHTML = `<span class="st"></span><span class="t"><span class="tt"></span></span>`;
+    b.querySelector('.tt').textContent = r.name; b.querySelector('.st').className = 'st ' + (running ? 'running' : fresh ? 'unread' : 'hollow');
+    if (fresh) b.appendChild(el('span', 'badge', `${fresh} new`));
+    b.onclick = () => showRoutine(r.id); b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showRoutine(r.id); } };
+    return b;
   }
   const folderName = (p) => (!p ? 'Other' : p === S.home ? 'Home folder' : baseName(p) || p);
   const latest = (g) => g.items.reduce((m, s) => Math.max(m, s.when), 0);
@@ -187,11 +210,10 @@
     // a div, not a button: the row holds its own "more" button
     const b = el('div', 'row' + (isActive(s) ? ' active' : '') + (s.archived ? ' archived' : ''));
     b.tabIndex = 0; b.setAttribute('role', 'button');
-    b.innerHTML = `<span class="st"></span><span class="t"><span class="tt"></span><small></small></span><button class="ib sm more" title="More actions">${icon('vmore')}</button>`;
+    b.innerHTML = `<span class="st"></span><span class="t"><span class="tt"></span></span><button class="ib sm more" title="More actions">${icon('vmore')}</button>`;
     b.querySelector('.tt').textContent = s.title;
-    b.querySelector('small').textContent = (s.status === 'waiting' ? 'Needs your approval · ' : s.status === 'running' ? 'Working… · ' : '') + ago(s.when);
-    b.querySelector('.st').className = 'st ' + (s.status === 'waiting' ? 'waiting' : s.status === 'running' ? 'running' : s.unread ? 'unread' : '');
-    if (s.pinned) b.appendChild(el('span', 'pin', '📌'));
+    b.title = `${s.title}\n${s.status === 'waiting' ? 'Needs your approval · ' : s.status === 'running' ? 'Working… · ' : ''}${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`;
+    b.querySelector('.st').className = 'st ' + (s.status === 'waiting' ? 'waiting' : s.status === 'running' ? 'running' : s.unread ? 'unread' : s.kind === 'chat' ? '' : 'hollow');
     b.onclick = () => openSession(s);
     b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSession(s); } else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); deleteSession(s); } };
     b.oncontextmenu = (e) => { e.preventDefault(); sessionMenu(e, s); };
@@ -230,49 +252,49 @@
     if (folder) { S.newFolder = folder; if (S.tab === 'chat') setTab('code'); }
     S.newMode = null; S.newModel = null; S.newEffort = null;
     const first = (S.user || '').split(' ')[0];
-    $('welcomeTitle').textContent = S.tab === 'chat' ? `Welcome, ${first}` : S.tab === 'cowork' ? `What should I take care of, ${first}?` : `What's up next, ${first}?`;
-    welcomeComposer.setPlaceholder(S.tab === 'chat' ? 'How can I help you today?' : S.tab === 'cowork' ? 'Describe the task. Claude works in the folder on its own.' : 'Describe a task or ask a question');
-    renderWelcomeChips(); renderJump();
+    $('welcomeTitle').textContent = first ? `Welcome, ${first}` : 'Welcome';
+    welcomeComposer.setPlaceholder('How can I help you today?');
+    renderWelcomeChips(); renderSuggest();
     welcomeComposer.focus();
   }
   function renderWelcomeChips() {
     const chat = S.tab === 'chat';
-    $('projectChip').hidden = chat; $('modeChip').hidden = chat;
+    $('kindSeg').hidden = S.tab === 'code';
+    document.querySelectorAll('#kindSeg button').forEach((b) => b.classList.toggle('active', b.dataset.k === S.tab));
+    $('projectChip').hidden = chat;
     if (!chat) {
       if (!S.newFolder || !S.projects.some((p) => p.path === S.newFolder)) S.newFolder = S.projects[0]?.path || S.newFolder || '';
       $('projectChipText').textContent = S.newFolder ? baseName(S.newFolder) : 'Select folder…';
       $('projectChip').title = S.newFolder || '';
     }
-    const mode = S.newMode || (S.tab === 'cowork' ? S.settings.coworkMode : S.settings.mode) || 'default';
-    $('modeChipText').textContent = MODE_SHORT[mode] || mode;
     $('modelChipText').textContent = modelLabel(S.newModel ?? S.settings.model ?? '');
-    $('effortChipText').textContent = EFFORT_LABEL[S.newEffort ?? S.settings.effort ?? ''] || 'Default effort';
+    $('effortChipText').textContent = effortShort(S.newEffort ?? S.settings.effort ?? '');
   }
-  function modelMenu(e, onPick) {
-    menu(e, MODELS.map(([v, l]) => [v === '__custom' ? 'Custom model ID…' : l, () => {
-      if (v === '__custom') { const id = prompt('Model ID (for example an Amazon Bedrock model or inference profile ID):', store.get('customModel', '')); if (!id) return; store.set('customModel', id.trim()); onPick(id.trim()); }
-      else onPick(v);
-    }]), 'Model');
+  const effortShort = (v) => ({ '': 'Default', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Very high', max: 'Max' }[v] || v);
+  const MODEL_DESC = { '': 'What Claude Code is set to use', opus: 'For complex work and everyday tasks', sonnet: 'Most efficient for simpler tasks', haiku: 'Fastest for quick answers' };
+  // One picker like claude.ai: models with a description and a check mark, then Effort › and More models ›.
+  function modelMenu(e, current, effort, onPick, onEffort) {
+    const custom = store.get('customModel', '');
+    const items = MODELS.filter(([v]) => v !== '__custom').map(([v, l]) => ({ label: l, desc: MODEL_DESC[v], check: (current || '') === v, fn: () => onPick(v) }));
+    if (current && !['opus', 'sonnet', 'haiku'].includes(current)) items.push({ label: shortModel(current), desc: 'Custom model ID', check: true, fn: () => onPick(current) });
+    else if (custom) items.push({ label: shortModel(custom), desc: 'Custom model ID', check: false, fn: () => onPick(custom) });
+    items.push({ sep: true });
+    items.push({ label: 'Effort', right: effortShort(effort || ''), arrow: true, fn: () => richMenu(e, Object.entries(EFFORT_LABEL).map(([v, l]) => ({ label: l.replace(' effort', '') || l, check: (effort || '') === v, fn: () => onEffort(v) }))) });
+    items.push({ label: 'More models', arrow: true, fn: () => { const id = prompt('Model ID (for example an Amazon Bedrock model or inference profile ID):', custom); if (!id) return; store.set('customModel', id.trim()); onPick(id.trim()); } });
+    richMenu(e, items);
   }
   $('projectChip').onclick = (e) => {
     const entries = S.projects.map((p) => [p.name + '  ·  ' + shortPath(p.path), () => { S.newFolder = p.path; renderWelcomeChips(); }]);
     entries.push(null, ['Browse for a folder…', () => pickFolder(S.newFolder || S.home, (p) => { S.newFolder = p; send({ type: 'addProject', path: p }); renderWelcomeChips(); })]);
     menu(e, entries, 'Project folder');
   };
-  $('modeChip').onclick = (e) => menu(e, Object.entries(MODE_LABEL).map(([v, l]) => [l, () => { S.newMode = v; renderWelcomeChips(); }]), 'Permissions');
-  $('effortChip').onclick = (e) => menu(e, Object.entries(EFFORT_LABEL).map(([v, l]) => [l, () => { S.newEffort = v; renderWelcomeChips(); }]), 'Thinking effort');
-  $('modelChip').onclick = (e) => modelMenu(e, (v) => { S.newModel = v; renderWelcomeChips(); });
-  function renderJump() {
-    const box = $('jump'); box.innerHTML = '';
-    const items = visibleSessions(S.tab).slice(0, 4);
-    if (!items.length) return;
-    box.appendChild(el('div', 'lbl', 'Jump back in'));
-    for (const s of items) {
-      const b = el('button', 'row'); b.innerHTML = `<span class="icon">${icon(S.tab)}</span><span class="t"><span class="tt"></span><small></small></span>`;
-      b.querySelector('.tt').textContent = s.title;
-      b.querySelector('small').innerHTML = `<span>${s.status === 'running' ? 'Working…' : s.status === 'waiting' ? 'Needs approval' : s.unread ? 'Ready to review' : 'Idle'}</span><span class="m"> · ${KIND_LABEL[s.kind]} · ${S.tab === 'chat' ? '' : esc(folderName(s.cwd)) + ' · '}${ago(s.when)}</span>`;
-      b.onclick = () => openSession(s); box.appendChild(b);
-    }
+  $('kindSeg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; store.set('chatKind', b.dataset.k); setTab(b.dataset.k); welcomeComposer.focus(); };
+  $('modelChip').onclick = (e) => modelMenu(e, S.newModel ?? S.settings.model ?? '', S.newEffort ?? S.settings.effort ?? '', (v) => { S.newModel = v; renderWelcomeChips(); }, (v) => { S.newEffort = v; renderWelcomeChips(); });
+  // suggestion chips under the composer, like claude.ai's Write / Learn / …
+  const SUGGEST = [['edit', 'Write', 'Help me write '], ['skill', 'Learn', 'Explain, step by step, '], ['code', 'Code', 'Write code that '], ['file', 'Summarize', 'Summarize the attached files: '], ['dash', 'Plan', 'Help me plan ']];
+  function renderSuggest() {
+    const box = $('suggest'); box.innerHTML = '';
+    for (const [ic, label, prefix] of SUGGEST) { const b = el('button', 'sbtn'); b.innerHTML = icon(ic); b.appendChild(el('span', null, label)); b.onclick = () => welcomeComposer.setText(prefix); box.appendChild(b); }
   }
 
   // session
@@ -653,10 +675,10 @@
   // browser view (live screencast of the browser Claude drives, or its latest screenshot).
   // Shown by default in Cowork and Code sessions that have the browser on ("lazy": the browser itself is
   // only launched when Claude first uses it); the globe button hides it again for this session.
-  let browserWatching = false, browserFrameSrc = '', browserFrameShot = false, browserHidden = false;
+  let browserWatching = false, browserFrameSrc = '', browserHidden = false;
   const isBlankUrl = (u) => !u || /^about:blank/.test(u);
   function resetBrowserView() { if (browserWatching) send({ type: 'browserWatch', on: false }); browserWatching = false; browserHidden = false; $('browserSec').hidden = true; $('browserBtn').classList.remove('on'); clearBrowserFrame(); $('browserNote').textContent = 'Opening the browser…'; }
-  function clearBrowserFrame() { $('browserView').classList.remove('has'); $('browserImg').src = ''; browserFrameSrc = ''; browserFrameShot = false; $('browserTitle').textContent = ''; }
+  function clearBrowserFrame() { $('browserView').classList.remove('has'); $('browserImg').src = ''; browserFrameSrc = ''; $('browserTitle').textContent = ''; }
   function syncBrowserView() {
     const i = S.info; if (!i) return;
     const want = !!i.browser && i.kind !== 'chat' && !browserHidden;
@@ -665,8 +687,7 @@
   }
   function browserState(m) {
     const blank = !m.page || isBlankUrl(m.page.url);
-    if (m.frame && !blank) showBrowserFrame('data:image/jpeg;base64,' + m.frame, m.page?.title);
-    else if (blank && !browserFrameShot) clearBrowserFrame();
+    if (m.frame && !blank) showBrowserFrame('data:image/jpeg;base64,' + m.frame, m.page?.title); // the last frame stays up while no page is open
     $('browserNote').textContent = m.live ? (blank ? 'Claude has not opened a page yet. It appears here as soon as it does.' : '') : m.lazy ? 'The browser opens here as soon as Claude uses it.' : 'Could not open a browser with a live view. Screenshots Claude takes will still appear here.';
     if (!blank) $('browserTitle').textContent = m.page.title || m.page.url || '';
   }
@@ -677,7 +698,7 @@
     if (on) { if (!lazy) openPanel(true); send({ type: 'browserWatch', on: true, lazy }); } else send({ type: 'browserWatch', on: false });
   }
   function showBrowserFrame(src, title, isShot) {
-    browserFrameSrc = src; browserFrameShot = !!isShot; const img = $('browserImg'); img.src = src; $('browserView').classList.add('has');
+    browserFrameSrc = src; const img = $('browserImg'); img.src = src; $('browserView').classList.add('has');
     if (title) $('browserTitle').textContent = title;
     if (isShot && !browserWatching) { $('browserSec').hidden = false; openPanel(true); }
   }
