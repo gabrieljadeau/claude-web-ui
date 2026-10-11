@@ -281,7 +281,7 @@ body.resizing-y { cursor: row-resize; user-select: none; } body.resizing-y * { c
 .bbody.has:focus-within::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 2px var(--accent); opacity: .6; }
 .bbody .bempty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 20px; overflow: auto; }
 .bbody.has .bempty { display: none; }
-.bhint { color: var(--muted); font-size: 13px; text-align: center; line-height: 1.5; margin: 0; position: absolute; bottom: 18px; left: 20px; right: 20px; }
+.bhint { color: var(--muted); font-size: 13px; text-align: center; line-height: 1.5; margin: 0; } .bhint code { font-family: var(--mono); font-size: 12px; }
 .launch { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; min-width: min(420px, 100%); max-width: 100%; overflow: hidden; } .launch:empty { display: none; }
 .launch-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; border-top: 1px solid var(--line2); font-size: 14px; } .launch-row:first-child { border-top: 0; }
 .launch-row svg { width: 16px; height: 16px; color: var(--muted); flex: none; } .launch-row .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

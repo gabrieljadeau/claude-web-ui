@@ -106,8 +106,12 @@ async function launchLiveBrowser() {
   const exe = findBrowserExe();
   if (!exe) { liveBrowser.ready = false; return false; }
   try {
-    const proc = spawn(exe, [`--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${BROWSER_PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-size=1280,900',
-      '--disable-features=TranslateUI', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', 'about:blank'], { detached: !IS_WIN, stdio: 'ignore', windowsHide: false });
+    // Headless by default: the Browser pane is the only view of it, like the embedded browser of the desktop app
+    // (no Chrome window pops up or steals the focus). CLAUDE_WEB_UI_BROWSER_WINDOW=1 shows the real window instead.
+    const args = [`--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${BROWSER_PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-size=1280,860',
+      '--disable-features=TranslateUI', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'];
+    if (!process.env.CLAUDE_WEB_UI_BROWSER_WINDOW) args.push('--headless=new');
+    const proc = spawn(exe, [...args, 'about:blank'], { detached: !IS_WIN, stdio: 'ignore', windowsHide: true });
     proc.unref(); liveBrowser.proc = proc;
   } catch { liveBrowser.ready = false; return false; }
   for (let i = 0; i < 40; i++) { await new Promise((r) => setTimeout(r, 250)); if (await httpJson(cdpUrl('/version'))) { liveBrowser.ready = true; return true; } }
@@ -141,6 +145,7 @@ async function screencastTick() {
   if (liveBrowser.target === page.id && liveBrowser.cdp?.readyState === 1) { broadcast(browserStateMsg()); return; }
   closeCdp();
   liveBrowser.target = page.id;
+  await httpJson(cdpUrl('/activate/' + page.id), 1500); // only the foreground tab produces screencast frames
   const raw = (await httpJson(cdpUrl('/list')))?.find?.((t) => t.id === page.id);
   if (!raw?.webSocketDebuggerUrl) return;
   const ws = new WsClient(raw.webSocketDebuggerUrl, { perMessageDeflate: false });
@@ -177,7 +182,7 @@ async function browserAction(msg) {
   const a = msg.action;
   if (a === 'newTab' || (a === 'navigate' && !liveBrowser.cdp)) {
     const t = await httpJson(cdpUrl('/new?' + (a === 'navigate' ? normalizeUrl(msg.url) : 'about:blank')), 2000, 'PUT');
-    if (t?.id) { liveBrowser.wanted = t.id; liveBrowser.target = null; }
+    if (t?.id) { liveBrowser.wanted = t.id; liveBrowser.target = null; await httpJson(cdpUrl('/activate/' + t.id), 1500); }
   } else if (a === 'selectTab') { liveBrowser.wanted = msg.id; liveBrowser.target = null; await httpJson(cdpUrl('/activate/' + msg.id), 1500); }
   else if (a === 'closeTab') { await httpJson(cdpUrl('/close/' + msg.id), 1500); if (liveBrowser.wanted === msg.id) liveBrowser.wanted = null; }
   else if (a === 'navigate') { liveBrowser.wanted = liveBrowser.target; await cdpSend('Page.navigate', { url: normalizeUrl(msg.url) }); }
@@ -297,7 +302,7 @@ async function fsSearch(root, q, content) {
     for (const e of ents) {
       if (out.length >= 100) return; seen++;
       const p = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) await walk(p, depth + 1); continue; }
+      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) await walk(p, depth + 1); continue; }
       if (!e.isFile()) continue;
       if (!content) { if (e.name.toLowerCase().includes(needle)) out.push({ path: p, name: e.name, rel: path.relative(root, p) }); continue; }
       try {
