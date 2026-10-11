@@ -519,15 +519,22 @@ function queryOptions(rt, ac) {
   return opts;
 }
 
+const CONTEXT_FULL = /prompt is too long|context window|too many tokens|exceeds? (the )?(maximum )?(context|input) (length|limit)|input length and `max_tokens`/i;
 async function runTurn(rt, text) {
   if (rt.status !== 'idle') return;
   const ac = new AbortController();
   rt.abort = ac;
   setStatus(rt, 'running');
+  const go = async (prompt) => { const q = query({ prompt, options: queryOptions(rt, ac) }); for await (const m of q) handleSdkMessage(rt, m); };
   try {
     if (rt.browser && rt.kind !== 'chat' && !liveBrowser.ready) await ensureLiveBrowser();
-    const q = query({ prompt: text, options: queryOptions(rt, ac) });
-    for await (const m of q) handleSdkMessage(rt, m);
+    rt.contextFull = false;
+    if (/^\/compact\b/.test(text)) { await compactTurn(rt, go); }
+    else {
+      await go(text);
+      // The window overflowed: summarize the conversation, then send the same message again (once).
+      if (rt.contextFull && !ac.signal.aborted) { emit(rt, { type: 'note', text: 'The context window is full: compacting the conversation, then sending your message again…' }); rt.contextFull = false; await compactTurn(rt, go); if (!ac.signal.aborted) await go(text); }
+    }
   } catch (err) {
     if (!ac.signal.aborted) {
       const msg = String(err?.message || err);
@@ -545,7 +552,31 @@ async function runTurn(rt, text) {
   }
 }
 
+// /compact through the SDK: its own init/result messages are not shown as a turn; the compact_boundary system message reports the result.
+async function compactTurn(rt, go) {
+  rt.compacting = true;
+  try { await go('/compact'); } finally { rt.compacting = false; }
+  if (rt.contextFull) { rt.contextFull = false; emit(rt, { type: 'note', text: 'Compaction failed: the conversation is too long to summarize. Start a new chat, or branch from an earlier message.', err: true }); }
+}
+function contextFromUsage(rt, u) {
+  if (!u || typeof u.input_tokens !== 'number') return;
+  const used = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0);
+  if (!used) return;
+  rt.context = { used, window: rt.context?.window || 200000 };
+  broadcast({ type: 'context', sid: rt.localId, context: rt.context });
+}
 function handleSdkMessage(rt, m) {
+  if (m.type === 'system' && m.subtype === 'compact_boundary') {
+    const c = m.compact_metadata || {};
+    if (typeof c.post_tokens === 'number') { rt.context = { used: c.post_tokens, window: rt.context?.window || 200000 }; broadcast({ type: 'context', sid: rt.localId, context: rt.context }); }
+    emit(rt, { type: 'note', text: `Conversation compacted${c.pre_tokens ? `: ${Math.round(c.pre_tokens / 1000)}k → ${Math.round((c.post_tokens || 0) / 1000)}k tokens` : ''}.` });
+    return;
+  }
+  if (rt.compacting) {   // only errors and the boundary above matter while /compact runs
+    if (m.type === 'result' && (m.subtype !== 'success' || m.is_error)) { const msg = m.errors?.join?.('\n') || m.result || m.subtype; if (CONTEXT_FULL.test(msg)) rt.contextFull = true; else emit(rt, { type: 'note', text: `Compaction failed: ${msg}`, err: true }); }
+    if (m.type === 'system' && m.subtype === 'init' && m.session_id && m.session_id !== rt.sdkId) { rt.sdkId = m.session_id; bySdk.set(rt.sdkId, rt); }
+    return;
+  }
   if (m.type === 'system' && m.subtype === 'init') {
     if (m.session_id && m.session_id !== rt.sdkId) {
       rt.sdkId = m.session_id;
@@ -585,6 +616,7 @@ function handleSdkMessage(rt, m) {
   if (m.type === 'assistant') {
     const content = m.message?.content || [];
     if (m.uuid) rt.lastUuid = m.uuid;
+    contextFromUsage(rt, m.message?.usage);
     const thinking = content.filter((b) => b.type === 'thinking').map((b) => b.thinking).join('\n\n');
     if (thinking) emit(rt, { type: 'thinking', text: thinking });
     const text = content.filter((b) => b.type === 'text').map((b) => b.text).join('\n\n');
@@ -609,9 +641,12 @@ function handleSdkMessage(rt, m) {
     const mu = m.modelUsage || {};
     const models = Object.entries(mu).sort((a, b) => (b[1].costUSD || 0) - (a[1].costUSD || 0));
     const u = m.usage || {};
-    const used = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.output_tokens || 0);
+    // m.usage adds up every API call of the turn, so it is not the context size (see contextFromUsage); only the window comes from here.
     const window = models.reduce((w, [, x]) => Math.max(w, x.contextWindow || 0), 0);
-    if (used) rt.context = { used, window: window || 200000 };
+    if (window && rt.context) rt.context.window = window;
+    const errText = ok ? '' : String(m.errors?.join?.('\n') || m.result || m.subtype || '');
+    if (!ok && CONTEXT_FULL.test(errText) && !rt.retriedCompact) { rt.contextFull = true; rt.retriedCompact = true; return; }   // runTurn compacts and retries
+    if (ok) rt.retriedCompact = false;
     const model = rt.model || (models[0] ? (models[0][1].canonicalModel || models[0][0]) : '');
     state.usage.push({ at: Date.now(), sid: rt.sdkId, kind: rt.kind, title: (rt.title || firstUserText(rt) || '').slice(0, 80), model: String(model).slice(0, 80), cost: turnCost || 0,
       in: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), out: u.output_tokens || 0, ms: m.duration_ms || 0, turns: m.num_turns || 0 });
@@ -1343,6 +1378,7 @@ wss.on('connection', async (ws) => {
         case 'termOpen': if (rt) { const t = termOpen(rt); send({ type: 'termOpened', sid: rt.localId, shell: t.shell, cwd: rt.cwd }); } break;
         case 'termRun': if (rt && typeof msg.cmd === 'string') termRun(rt, msg.cmd); break;
         case 'termKill': if (rt) { termKill(rt); const t = termOpen(rt); send({ type: 'termOpened', sid: rt.localId, shell: t.shell, cwd: rt.cwd, restarted: true }); } break;
+        case 'compact': if (rt && rt.status === 'idle' && rt.sdkId) runTurn(rt, '/compact'); break;
         case 'authCheck': send({ type: 'auth', auth: await checkAuth() }); break;
         case 'updateCheck': send({ type: 'update', ...(await checkUpdate()), manual: true }); break;
         case 'updateApply': applyUpdate(); break;
