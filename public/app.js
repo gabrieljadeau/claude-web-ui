@@ -222,7 +222,7 @@
     const arr = [...groups.values()].sort((a, b) => (latest(b) - latest(a)) || a.name.localeCompare(b.name));
     // Two views of the Code sessions: grouped by project, or by date (Today, Yesterday…).
     const view = store.get('sessionView') || 'project';
-    const tog = el('span', 'pills small view-tog');
+    const tog = el('span', 'view-tog');
     for (const [v, label] of [['project', tr('Project')], ['date', tr('Date')]]) {
       const b = el('button', view === v ? 'on' : null, label); b.onclick = (e) => { e.stopPropagation(); store.set('sessionView', v); renderList(); }; tog.appendChild(b);
     }
