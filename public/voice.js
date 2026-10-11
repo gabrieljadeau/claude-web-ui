@@ -224,6 +224,8 @@
   }
   function syncMute() { const b = $('voiceMute'); b.classList.toggle('on', muted); b.querySelector('span').textContent = muted ? tr('Unmute') : tr('Mute'); }
   function toggleMute() { muted = !muted; syncMute(); heard = ''; interim = ''; $('voiceTranscript').textContent = ''; if (state === 'listening' || state === 'muted') setState(muted ? 'muted' : 'listening'); }
+  // "Talk" button: cut Claude off (speech and turn) and listen right away, unmuting if needed
+  function talkNow() { if (muted) toggleMute(); interrupt(); }
   function orbTap() {
     if (state === 'speaking' || state === 'thinking') interrupt();
     else if ((heard + interim).trim()) sendHeard();
@@ -260,7 +262,7 @@
 
   function init(bridge) {
     app = bridge;
-    $('voiceEnd').onclick = closeView; $('voiceMute').onclick = toggleMute; $('voiceOrb').onclick = orbTap;
+    $('voiceEnd').onclick = closeView; $('voiceMute').onclick = toggleMute; $('voiceTalk').onclick = talkNow; $('voiceOrb').onclick = orbTap;
     $('voiceLang').onchange = (e) => changeLang(e.target.value);
     window.addEventListener('keydown', (e) => { if (open && e.key === 'Escape' && !e.target.closest?.('input, textarea, [contenteditable]')) closeView(); });
     wireSettings();

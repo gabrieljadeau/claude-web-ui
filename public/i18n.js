@@ -13,6 +13,7 @@
     'Thinking…': ["Je réfléchis…", "Pensando…", "Sto pensando…", "Ich überlege…"],
     'Speaking… tap the circle to interrupt': ["Je parle… touchez le cercle pour m’interrompre", "Hablando… toca el círculo para interrumpir", "Sto parlando… tocca il cerchio per interrompere", "Ich spreche… tippe auf den Kreis zum Unterbrechen"],
     'Microphone off': ["Micro coupé", "Micrófono apagado", "Microfono spento", "Mikrofon aus"],
+    'Talk': ["Parler", "Hablar", "Parla", "Sprechen"],
     'Mute': ["Couper le micro", "Silenciar", "Disattiva microfono", "Stumm"],
     'Unmute': ["Réactiver le micro", "Activar micrófono", "Riattiva microfono", "Mikrofon an"],
     'End': ["Terminer", "Terminar", "Termina", "Beenden"],
