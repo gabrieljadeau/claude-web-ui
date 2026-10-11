@@ -57,6 +57,7 @@ const REPO = detectRepo();
 const PROMPTS = {
   common: 'You are being used through a local web interface on the user\'s computer (Claude Web UI). Keep answers readable: short paragraphs, lists where helpful.',
   chat: 'This is a general conversation ("Chat"): you have no project folder. You can read files the user attaches and fetch web pages, nothing else. Do not try to run commands or edit files.',
+  chatShell: 'This is a general conversation ("Chat") with a terminal: you have no project folder, but you can run shell commands with the Bash tool. They run in the user\'s home folder. Use the terminal for what the user asks on their computer: open an application (open -a Name), look something up, launch a script. Every command is shown to the user, who approves or refuses it before it runs (a few harmless ones such as "open -a App" run directly), so keep commands short, one action each, and say in a few words what each one does. Do not create or edit files unless the user asks. You can also read files the user attaches and fetch web pages.',
   cowork: 'This is a "Cowork" task: the user gave you a folder to work in autonomously. Plan briefly, do the work, save results as files in that folder, and finish with a short summary of what you produced and where.',
   code: 'This is a "Code" session in a project folder, like the claude terminal command.',
   voice: 'The user is talking to you by voice and hears your reply through a speech synthesizer. Answer as in a spoken conversation: a few short, natural sentences, in the language the user speaks. No markdown, no headings, no lists, no tables, no code blocks and no URLs (describe them in words instead). Give detail only when asked.',
@@ -343,7 +344,7 @@ function termKill(rt) { const t = rt.term; if (!t?.proc) return; rt.term = null;
 // ------------------------------------------------------- persistent state
 const state = loadState();
 function loadState() {
-  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'default', coworkMode: 'auto', browser: true, lang: 'fr-FR', repo: '', githubToken: '' } };
+  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'default', coworkMode: 'auto', browser: true, chatShell: false, lang: 'fr-FR', repo: '', githubToken: '' } };
   try {
     const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     const st = { ...def, ...s, settings: { ...def.settings, ...(s.settings || {}) } };
@@ -357,6 +358,7 @@ function saveState() {
   saveTimer = setTimeout(() => fsp.writeFile(STATE_FILE, JSON.stringify(state, null, 2)).catch(() => {}), 200);
 }
 function metaOf(sdkId) { return state.meta[sdkId] || {}; }
+function setLang(rt, lang) { if (!lang || rt.lang === lang) return; rt.lang = lang; if (rt.sdkId) setMeta(rt.sdkId, { lang }); }
 function setMeta(sdkId, patch) { state.meta[sdkId] = { ...metaOf(sdkId), ...patch }; saveState(); }
 
 // ---------------------------------------------------------------- 2. auth
@@ -419,6 +421,7 @@ function createRuntime({ kind, cwd, sdkId = null, title = '', items = [], mode, 
     model: model ?? state.settings.model,
     effort: state.settings.effort || '',
     browser: state.settings.browser,
+    shell: kind === 'chat' && cwd !== CHAT_DIR && !!state.settings.chatShell,   // Chat with a terminal: Bash allowed, every command approved by hand
     lastUuid: null,               // uuid of the last assistant message: the cut point used by edit / retry
     liveThinking: '',
     routineId,
@@ -438,7 +441,7 @@ function emit(rt, ev) {
     case 'thinkingDelta': rt.liveThinking += ev.text; break;
     case 'thinking': rt.liveThinking = ''; rt.items.push({ type: 'thinking', text: ev.text }); break;
     case 'delta': rt.liveText += ev.text; break;
-    case 'assistantText': rt.liveText = ''; rt.items.push({ type: 'assistant', text: ev.text }); break;
+    case 'assistantText': rt.liveText = ''; rt.items.push({ type: 'assistant', text: ev.text }); if (rt.voice) { const m = LANG_TAG.exec(ev.text || ''); if (m) setLang(rt, m[1].toLowerCase() + (m[2] ? '-' + m[2].toUpperCase() : '')); } break;
     case 'toolUse': if (String(ev.name).startsWith('mcp__browser__')) liveBrowser.wanted = null; if (!ev.parent) rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false, parent: ev.parent || null }); break;
     case 'subText': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.parent); if (t) t.subText = (t.subText ? t.subText + '\n' : '') + ev.text; break; }
     case 'toolResult': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.id); if (t) { t.result = ev.content; t.isError = ev.isError; if (ev.images?.length) t.images = ev.images; } break; }
@@ -470,9 +473,25 @@ function allowKey(toolName) {
   return toolName.startsWith('mcp__') ? toolName.split('__').slice(0, 2).join('__') : toolName;
 }
 
+// Commands a Chat session may run without asking: launching an application, and a few harmless lookups.
+// Anything with a shell operator (;, &&, |, redirection, substitution) always asks.
+const SAFE_SHELL = [
+  /^open -a ("[^"]+"|'[^']+'|[\w.-]+)( ("[^"]+"|'[^']+'|~?[\w./:-]+))?$/,   // open -a Safari [file or url]
+  /^(pwd|date|whoami|uptime|cal)$/,
+  /^ls( -[alhtrF]+)*( ~?[\w./-]+)?$/,
+];
+function safeShellCommand(cmd) {
+  const c = String(cmd || '').trim();
+  if (!c || /[;&|<>`$\n\\]/.test(c)) return false;
+  return SAFE_SHELL.some((re) => re.test(c));
+}
+
 function makePermissionHandler(rt) {
   return (toolName, input, { signal }) => {
-    if (rt.alwaysAllow.has(allowKey(toolName))) return Promise.resolve({ behavior: 'allow', updatedInput: input });
+    // Terminal in Chat: whitelisted commands run directly; every other command is approved by hand, every time ("always allow" does not apply).
+    const chatShell = rt.shell && toolName === 'Bash';
+    if (chatShell && safeShellCommand(input?.command)) return Promise.resolve({ behavior: 'allow', updatedInput: input });
+    if (!chatShell && rt.alwaysAllow.has(allowKey(toolName))) return Promise.resolve({ behavior: 'allow', updatedInput: input });
     // Read-only lookups never need a prompt once the user already accepted edits.
     if (rt.mode === 'acceptEdits' && READ_ONLY_TOOLS.has(toolName)) return Promise.resolve({ behavior: 'allow', updatedInput: input });
     return new Promise((resolve) => {
@@ -486,7 +505,7 @@ function makePermissionHandler(rt) {
       signal?.addEventListener('abort', () => {
         if (rt.pending.has(id)) rt.pending.get(id)({ behavior: 'deny', message: 'Cancelled.' });
       }, { once: true });
-      emit(rt, { type: 'permission', id, tool: toolName, input });
+      emit(rt, { type: 'permission', id, tool: toolName, input, noAlways: chatShell || undefined });
       setStatus(rt, 'waiting');
     });
   };
@@ -499,28 +518,33 @@ function denyAllPending(rt, message) {
 
 function queryOptions(rt, ac) {
   const kind = rt.kind;
-  const append = [PROMPTS.common, PROMPTS[kind]];
+  const append = [PROMPTS.common, rt.shell ? PROMPTS.chatShell : PROMPTS[kind]];
   const browser = rt.browser && kind !== 'chat';
   if (browser) append.push(PROMPTS.browser);
-  if (rt.voice) { append.push(PROMPTS.voice); if (rt.voiceLang) append.push(`The speech recognizer was set to ${rt.voiceLang}. If the user's words read like another language transcribed wrongly, they probably spoke that language. Start your reply with the tag [lang:xx-XX] giving the BCP-47 code of the language the user actually spoke (one of fr-FR, es-ES, en-US, it-IT, de-DE; keep ${rt.voiceLang} when unsure or when the words are too short to tell), then answer in that language.`); }
+  if (rt.lang) append.push(`The user's language in this conversation is ${LANG_NAMES[rt.lang.slice(0, 2)] || rt.lang}: every reply, spoken or written, is in that language unless the user clearly switches to another one.`);
+  if (rt.voice) { append.push(PROMPTS.voice); if (rt.voiceLang) append.push(`REQUIRED: the very first characters of your reply must be a tag of the form [lang:xx-XX] (for example [lang:es-ES]) naming the language the user actually spoke, one of fr-FR, es-ES, en-US, it-IT, de-DE. The interface removes this tag before the reply is shown or read aloud and uses it to switch the microphone and the voice. The speech recognizer was set to ${rt.voiceLang}; if the words read like another language transcribed wrongly, the user probably spoke that one; keep ${rt.voiceLang} only when unsure or when the words are too short to tell. Answer in the language of the tag.`); }
   const opts = {
     cwd: rt.cwd,
     resume: rt.sdkId || undefined,
     abortController: ac,
     includePartialMessages: true,
-    permissionMode: rt.mode,
+    // A Chat with a terminal never runs in a mode that would skip the approval of a command.
+    permissionMode: rt.shell && (rt.mode === 'bypassPermissions' || rt.mode === 'auto') ? 'default' : rt.mode,
     model: rt.model || undefined,
-    effort: rt.effort || undefined,
+    effort: rt.effort || (rt.voice ? 'low' : undefined),   // a spoken turn wants a quick short answer, not a long think
     systemPrompt: { type: 'preset', preset: 'claude_code', append: append.join(' ') },
     mcpServers: browser ? { browser: browserServer() } : {},
     canUseTool: makePermissionHandler(rt),
   };
-  if (rt.mode === 'bypassPermissions') opts.allowDangerouslySkipPermissions = true;
-  if (kind === 'chat') opts.tools = ['Read', 'WebFetch', 'WebSearch'];
+  if (rt.mode === 'bypassPermissions' && !rt.shell) opts.allowDangerouslySkipPermissions = true;
+  if (kind === 'chat') opts.tools = rt.shell ? ['Read', 'WebFetch', 'WebSearch', 'Bash'] : ['Read', 'WebFetch', 'WebSearch'];
   if (rt.title && !rt.sdkId) opts.title = rt.title;
   return opts;
 }
 
+const LANG_NAMES = { fr: 'French', es: 'Spanish', en: 'English', it: 'Italian', de: 'German' };
+const LANG_TAG = /^\s*\[lang:([a-z]{2})(?:-([a-z]{2}))?\]/i;   // voice replies start with the language Claude heard
+const AUTO_COMPACT_AT = 0.9;   // share of the context window at which a turn starts with a compaction
 const CONTEXT_FULL = /prompt is too long|context window|too many tokens|exceeds? (the )?(maximum )?(context|input) (length|limit)|input length and `max_tokens`/i;
 async function runTurn(rt, text) {
   if (rt.status !== 'idle') return;
@@ -533,6 +557,10 @@ async function runTurn(rt, text) {
     rt.contextFull = false;
     if (/^\/compact\b/.test(text)) { await compactTurn(rt, go); }
     else {
+      // The window is nearly full (meter at 90 % or more): summarize first, so the message does not fail and get retried.
+      const ctx = rt.context; const pct = ctx?.used && ctx?.window ? ctx.used / ctx.window : 0;
+      if (pct >= AUTO_COMPACT_AT && !ac.signal.aborted) { emit(rt, { type: 'note', text: `The context window is ${Math.round(pct * 100)} % full: compacting the conversation before sending your message…` }); await compactTurn(rt, go); }
+      if (ac.signal.aborted) return;
       await go(text);
       // The window overflowed: summarize the conversation, then send the same message again (once).
       if (rt.contextFull && !ac.signal.aborted) { emit(rt, { type: 'note', text: 'The context window is full: compacting the conversation, then sending your message again…' }); rt.contextFull = false; await compactTurn(rt, go); if (!ac.signal.aborted) await go(text); }
@@ -560,11 +588,15 @@ async function compactTurn(rt, go) {
   try { await go('/compact'); } finally { rt.compacting = false; }
   if (rt.contextFull) { rt.contextFull = false; emit(rt, { type: 'note', text: 'Compaction failed: the conversation is too long to summarize. Start a new chat, or branch from an earlier message.', err: true }); }
 }
-function contextFromUsage(rt, u) {
+// Context windows seen per model (the result message reports them): the first call of a session is measured against
+// the right window instead of 200k, so a 1M model does not show 100 % at the start.
+const knownWindow = new Map(Object.entries(state.windows || {}));
+function rememberWindow(model, w) { if (!model || !w || knownWindow.get(model) === w) return; knownWindow.set(model, w); state.windows = Object.fromEntries(knownWindow); saveState(); }
+function contextFromUsage(rt, u, model) {
   if (!u || typeof u.input_tokens !== 'number') return;
   const used = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0);
   if (!used) return;
-  rt.context = { used, window: rt.context?.window || 200000 };
+  rt.context = { used, window: rt.context?.window || knownWindow.get(model) || knownWindow.get(rt.model) || 200000 };
   broadcast({ type: 'context', sid: rt.localId, context: rt.context });
 }
 function handleSdkMessage(rt, m) {
@@ -583,7 +615,7 @@ function handleSdkMessage(rt, m) {
     if (m.session_id && m.session_id !== rt.sdkId) {
       rt.sdkId = m.session_id;
       bySdk.set(rt.sdkId, rt);
-      setMeta(rt.sdkId, { kind: rt.kind, routineId: rt.routineId || undefined });
+      setMeta(rt.sdkId, { kind: rt.kind, routineId: rt.routineId || undefined, lang: rt.lang || undefined });
       broadcast({ type: 'sdkId', sid: rt.localId, sdkId: rt.sdkId });
       sidebarDirty();
     }
@@ -618,7 +650,7 @@ function handleSdkMessage(rt, m) {
   if (m.type === 'assistant') {
     const content = m.message?.content || [];
     if (m.uuid) rt.lastUuid = m.uuid;
-    contextFromUsage(rt, m.message?.usage);
+    contextFromUsage(rt, m.message?.usage, m.message?.model);
     const thinking = content.filter((b) => b.type === 'thinking').map((b) => b.thinking).join('\n\n');
     if (thinking) emit(rt, { type: 'thinking', text: thinking });
     const text = content.filter((b) => b.type === 'text').map((b) => b.text).join('\n\n');
@@ -646,6 +678,7 @@ function handleSdkMessage(rt, m) {
     // m.usage adds up every API call of the turn, so it is not the context size (see contextFromUsage); only the window comes from here.
     const window = models.reduce((w, [, x]) => Math.max(w, x.contextWindow || 0), 0);
     if (window && rt.context) rt.context.window = window;
+    for (const [name, x] of models) rememberWindow(x.canonicalModel || name, x.contextWindow);
     const errText = ok ? '' : String(m.errors?.join?.('\n') || m.result || m.subtype || '');
     if (!ok && CONTEXT_FULL.test(errText) && !rt.retriedCompact) { rt.contextFull = true; rt.retriedCompact = true; return; }   // runTurn compacts and retries
     if (ok) rt.retriedCompact = false;
@@ -693,7 +726,7 @@ async function openFromDisk(sdkId, cwd) {
   const kind = meta.kind || (dir === CHAT_DIR ? 'chat' : 'code');
   const { items, lastUuid } = simplifyHistory(msgs);
   const rt = createRuntime({ kind, cwd: dir || os.homedir(), sdkId, title: info?.customTitle || info?.summary || '', items, routineId: meta.routineId || null });
-  rt.lastUuid = lastUuid;
+  rt.lastUuid = lastUuid; rt.lang = meta.lang || '';
   return rt;
 }
 
@@ -831,7 +864,7 @@ function projects() {
   // union of folders the user added and folders that have sessions
   const map = new Map();
   for (const p of state.projects) map.set(p.path, { path: p.path, name: p.name || path.basename(p.path), pinned: true });
-  for (const s of listingCache.items) if (s.cwd && s.cwd !== CHAT_DIR && s.cwd !== PROBE_DIR && !map.has(s.cwd)) map.set(s.cwd, { path: s.cwd, name: path.basename(s.cwd) || s.cwd, pinned: false });
+  for (const s of listingCache.items) if (s.cwd && s.cwd !== CHAT_DIR && s.cwd !== PROBE_DIR && metaOf(s.sessionId).kind !== 'chat' && !map.has(s.cwd)) map.set(s.cwd, { path: s.cwd, name: path.basename(s.cwd) || s.cwd, pinned: false });
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -1106,7 +1139,7 @@ server.on('upgrade', (req, socket, head) => {
 function sessionInfo(rt) {
   const meta = rt.sdkId ? metaOf(rt.sdkId) : {};
   return { sid: rt.localId, sdkId: rt.sdkId, kind: rt.kind, cwd: rt.cwd, title: rt.title || firstUserText(rt), status: rt.status, mode: rt.mode, model: rt.model,
-    browser: rt.browser, effort: rt.effort, cost: rt.cost, context: rt.context, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId };
+    browser: rt.browser, shell: rt.shell, effort: rt.effort, cost: rt.cost, context: rt.context, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId };
 }
 
 wss.on('connection', async (ws) => {
@@ -1126,7 +1159,7 @@ wss.on('connection', async (ws) => {
         // ---- sessions
         case 'new': {
           const kind = KINDS.includes(msg.kind) ? msg.kind : 'code';
-          const cwd = kind === 'chat' ? CHAT_DIR : safeDir(msg.cwd);
+          const cwd = kind === 'chat' ? (state.settings.chatShell ? os.homedir() : CHAT_DIR) : safeDir(msg.cwd);
           if (!cwd) { send({ type: 'error', message: `Folder not found: ${msg.cwd}` }); break; }
           const r = createRuntime({ kind, cwd });
           if (typeof msg.mode === 'string' && MODES.includes(msg.mode)) r.mode = msg.mode;
@@ -1150,6 +1183,7 @@ wss.on('connection', async (ws) => {
           if (!text && files.length) text = 'Please look at the attached files.';
           rt.voice = !!msg.voice;   // spoken turn: the reply is written to be read aloud
           rt.voiceLang = rt.voice && typeof msg.lang === 'string' && /^[a-z]{2}(-[A-Z]{2})?$/.test(msg.lang) ? msg.lang : '';   // recognizer language, so Claude can tell when another one was spoken
+          if (rt.voiceLang) setLang(rt, rt.voiceLang);   // speaking sets the conversation's language (the reply tag corrects it if another one was heard)
           if (!text) break;
           if (msg.edit) {
             // Edit / retry: continue from a copy of the conversation cut just before the edited message.
@@ -1196,7 +1230,7 @@ wss.on('connection', async (ws) => {
           if (!rt) break;
           const resolve = rt.pending.get(msg.id);
           if (!resolve) break;
-          if (msg.always) rt.alwaysAllow.add(allowKey(msg.tool || ''));
+          if (msg.always && !(rt.shell && msg.tool === 'Bash')) rt.alwaysAllow.add(allowKey(msg.tool || ''));
           resolve(msg.allow ? { behavior: 'allow' } : { behavior: 'deny', message: 'The user refused this action.' });
           sidebarDirty();
           break;
@@ -1347,6 +1381,7 @@ wss.on('connection', async (ws) => {
           if (MODES.includes(msg.coworkMode)) s.coworkMode = msg.coworkMode;
           if (typeof msg.model === 'string') s.model = msg.model.trim().slice(0, 200);
           if (typeof msg.browser === 'boolean') s.browser = msg.browser;
+          if (typeof msg.chatShell === 'boolean') s.chatShell = msg.chatShell;
           if (typeof msg.lang === 'string') s.lang = msg.lang.slice(0, 10);
           if (typeof msg.name === 'string') s.name = msg.name.trim().slice(0, 60);
           if (EFFORTS.includes(msg.effort)) s.effort = msg.effort;

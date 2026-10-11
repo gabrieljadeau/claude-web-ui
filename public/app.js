@@ -1171,14 +1171,17 @@
     if (S.skills === null) { send({ type: 'skills' }); onceHandlers.push((m) => { if (m.type === 'skills') open(); }); } else open();
   }
   let pendingFirst = null;
-  const welcomeComposer = makeComposer($('welcomeComposer'), (m) => {
-    if (!m || m.queued) return;
+  // A new session from the welcome screen (the composer, or voice mode): the current space's kind, folder, mode and model.
+  // `m` is the first message, sent once the session is open; voice mode passes none and talks afterwards.
+  function newSessionFromWelcome(m) {
     store.set('chatKind', S.tab === 'cowork' ? 'cowork' : 'chat');
-    const kind = S.tab; const cwd = kind === 'chat' ? '' : S.newFolder;
-    if (kind !== 'chat') { if (!cwd) return toast(tr('Choose a project folder first.'), true); store.set('lastFolder', cwd); send({ type: 'addProject', path: cwd }); }
-    pendingFirst = m;
+    let kind = S.tab; let cwd = kind === 'chat' ? '' : S.newFolder;
+    if (kind !== 'chat' && !cwd) { if (m) return toast(tr('Choose a project folder first.'), true); kind = 'chat'; }
+    if (kind !== 'chat') { store.set('lastFolder', cwd); send({ type: 'addProject', path: cwd }); }
+    pendingFirst = m || null;
     send({ type: 'new', kind, cwd, mode: kind === 'chat' ? undefined : (S.newMode || undefined), model: S.newModel ?? undefined, effort: S.newEffort ?? undefined });
-  }, { welcome: true, placeholder: tr('How can I help you today?') });
+  }
+  const welcomeComposer = makeComposer($('welcomeComposer'), (m) => { if (m && !m.queued) newSessionFromWelcome(m); }, { welcome: true, placeholder: tr('How can I help you today?') });
   // queue: messages typed while Claude is still working; sent in order when the turn ends ("Send now" interrupts).
   const queues = new Map(); let editing = null;
   const sessionComposer = makeComposer($('sessionComposer'), (m) => {
@@ -1771,13 +1774,15 @@
     toast,
     setLang(code) { S.settings.lang = code; const sel = $('setLang'); if (sel) sel.value = code; send({ type: 'settings', lang: code }); },
     stop() { if (S.view === 'session' && S.sid) send({ type: 'stop', sid: S.sid }); },
-    pane(v) { togglePane('voice', v); },
+    pane(v) { togglePane('voice', v); if (v && S.view !== 'session') newSessionFromWelcome(null); },
+    // "yes" / "no" said while a permission is pending answers the oldest open prompt (Allow once, or Refuse)
+    approve(allow) { const card = $('log').querySelector('.perm:not(.answered)'); if (!card) return false; const b = card.querySelectorAll('button'); (allow ? b[0] : b[b.length - 1]).click(); return true; },   // from the welcome screen: open a conversation first, the pane lives next to it
     send(text) {
       const lang = S.settings.lang || LOCALE || 'fr-FR';
       if (S.view === 'session' && S.info) {
         if (S.info.status !== 'idle') { const q = queues.get(S.sid) || []; q.push({ text, files: [], voice: true, lang }); queues.set(S.sid, q); renderQueue(); send({ type: 'stop', sid: S.sid }); }
         else send({ type: 'send', sid: S.sid, text, files: [], voice: true, lang });
-      } else { pendingFirst = { text, files: [], voice: true, lang }; send({ type: 'new', kind: 'chat', cwd: '' }); }
+      } else newSessionFromWelcome({ text, files: [], voice: true, lang });
     },
   });
   resetView(); setTab(S.tab); showWelcome(); connect();

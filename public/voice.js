@@ -16,9 +16,27 @@
 
   let app = null;                   // bridge given by app.js: { lang(), send(text), stop(), toast(msg, bad) }
   let open = false, state = 'idle', muted = false, turnRunning = false;
-  let rec = null, recActive = false, recWanted = false;
+  let rec = null, recActive = false, recWanted = false, recPaused = false;   // paused while Claude speaks: the microphone would hear the synthesizer
   let heard = '', interim = '', silenceTimer = 0, lastSent = '', lastSentAt = 0;
   let tagDone = false;              // the [lang:xx-XX] tag at the start of the reply has been read (or there is none)
+  let waitingApproval = false;      // Claude asked for a permission: "yes" / "no" answer it
+
+  // What the assistant says on its own, in the spoken language (not the interface language)
+  const SPOKEN = {
+    hello: { fr: 'Dis quelque chose, je t\'écoute.', es: 'Di algo, te escucho.', en: 'Say something, I am listening.', it: 'Di qualcosa, ti ascolto.', de: 'Sag etwas, ich höre zu.' },
+    approval: { fr: 'J\'ai besoin de ton accord pour continuer. Dis « oui » pour approuver, ou « non » pour refuser.', es: 'Necesito tu aprobación para continuar. Di «sí» para aprobar o «no» para rechazar.', en: 'I need your approval to continue. Say "yes" to approve, or "no" to refuse.', it: 'Ho bisogno della tua approvazione per continuare. Di «sì» per approvare o «no» per rifiutare.', de: 'Ich brauche deine Zustimmung, um weiterzumachen. Sag „ja“ zum Genehmigen oder „nein“ zum Ablehnen.' },
+    approved: { fr: 'D\'accord.', es: 'Vale.', en: 'All right.', it: 'Va bene.', de: 'In Ordnung.' },
+    refused: { fr: 'Refusé.', es: 'Rechazado.', en: 'Refused.', it: 'Rifiutato.', de: 'Abgelehnt.' },
+    test: { fr: 'Bonjour ! Voilà comment je vais te lire les réponses.', es: '¡Hola! Así es como te leeré las respuestas.', en: 'Hello! This is how I will sound when I read replies to you.', it: 'Ciao! Ecco come ti leggerò le risposte.', de: 'Hallo! So werde ich dir die Antworten vorlesen.' },
+    code: { fr: '(code)', es: '(código)', en: '(code)', it: '(codice)', de: '(Code)' },
+    link: { fr: '(lien)', es: '(enlace)', en: '(link)', it: '(link)', de: '(Link)' },
+  };
+  const base = () => (app ? app.lang() : 'fr-FR').slice(0, 2).toLowerCase();
+  const phrase = (k) => SPOKEN[k][base()] || SPOKEN[k].en;
+  // yes / no, as the recognizer writes them
+  const YES = { fr: /^(oui|ouais|d'accord|ok|okay|vas-y|approuv\w*|accept\w*|autoris\w*|c'est bon)\b/i, es: /^(s[ií]|vale|ok|okay|de acuerdo|adelante|aprob\w*|acept\w*|autoriz\w*|claro)\b/i, en: /^(yes|yeah|yep|ok|okay|sure|approve\w*|allow\w*|go ahead|accept\w*)\b/i, it: /^(s[iì]|va bene|ok|okay|d'accordo|approv\w*|accett\w*|autorizz\w*|procedi)\b/i, de: /^(ja|jawohl|ok|okay|in ordnung|genehmig\w*|erlaub\w*|weiter|einverstanden)\b/i };
+  const NO = { fr: /^(non|refus\w*|annul\w*|stop|arr[êe]te)\b/i, es: /^(no|rechaz\w*|cancel\w*|para|stop)\b/i, en: /^(no|nope|refuse\w*|deny|cancel\w*|stop)\b/i, it: /^(no|rifiut\w*|annull\w*|stop|ferma)\b/i, de: /^(nein|ablehn\w*|abbrech\w*|stopp?|nicht)\b/i };
+  function decideApproval(text) { const t = norm(text); const b = base(); if ((YES[b] || YES.en).test(t)) return true; if ((NO[b] || NO.en).test(t)) return false; return null; }
   let buffer = '', spokenRecent = '', queued = 0;
 
   const norm = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -33,7 +51,7 @@
     if (rec) return rec;
     rec = new (getSR())(); rec.continuous = true; rec.interimResults = true;
     rec.onstart = () => { recActive = true; };
-    rec.onend = () => { recActive = false; if (open && recWanted) setTimeout(() => { if (open && recWanted && !recActive) tryStart(); }, 250); }; // Chrome stops by itself now and then
+    rec.onend = () => { recActive = false; if (open && recWanted && !recPaused) setTimeout(() => { if (open && recWanted && !recPaused && !recActive) tryStart(); }, 250); }; // Chrome stops by itself now and then
     rec.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { recWanted = false; app.toast(tr('Microphone access was blocked. Allow it in the address bar and try again.'), true); closeView(); }
     };
@@ -46,13 +64,15 @@
   }
   function tryStart() { rec.lang = app.lang(); try { rec.start(); } catch { /* already started */ } }
   function startListening() { recWanted = true; ensureRec(); tryStart(); if (state !== 'speaking' && state !== 'thinking') setState(muted ? 'muted' : 'listening'); }
-  function stopListening() { recWanted = false; clearTimeout(silenceTimer); try { rec?.stop(); } catch { /* not running */ } }
+  function stopListening() { recWanted = false; recPaused = false; clearTimeout(silenceTimer); try { rec?.stop(); } catch { /* not running */ } }
+  function pauseRec() { if (recPaused) return; recPaused = true; heard = ''; interim = ''; clearTimeout(silenceTimer); try { rec?.abort(); } catch { /* not running */ } }
+  function resumeRec() { if (!recPaused) return; recPaused = false; setTimeout(() => { if (open && recWanted && !recPaused && !recActive) tryStart(); }, 300); }
 
   function isEcho(txt) { const n = norm(txt); return n.length < 8 || (spokenRecent && norm(spokenRecent).includes(n)); }
   function handleResult(fin, inter) {
-    if (muted || !open) return;
+    if (muted || !open || recPaused || state === 'speaking') return;   // nothing while Claude speaks: it would be the synthesizer's voice
     const txt = fin || inter;
-    if (state === 'speaking' || state === 'thinking') {
+    if (state === 'thinking' && !waitingApproval) {   // (while a permission is pending, short words like "yes" must get through)
       // barge-in: the user talks over Claude. Ignore short noises and the synthesizer's own voice picked up by the microphone.
       if (!txt || txt.split(/\s+/).length < MIN_BARGE_WORDS || isEcho(txt)) return;
       interrupt();
@@ -70,11 +90,16 @@
   function sendHeard() {
     clearTimeout(silenceTimer);
     const text = (heard + (interim ? (heard ? ' ' : '') + interim : '')).trim(); if (!text || !open) return;
-    heard = ''; interim = ''; lastSent = text; lastSentAt = Date.now(); $('voiceTranscript').textContent = text; $('voiceReply').textContent = '';
+    heard = ''; interim = ''; lastSent = text; lastSentAt = Date.now(); $('voiceTranscript').textContent = text;
+    if (waitingApproval) {   // an answer to the pending permission, not a message
+      const d = decideApproval(text);
+      if (d !== null && app.approve(d)) { waitingApproval = false; setState('thinking'); say(phrase(d ? 'approved' : 'refused')); return; }
+    }
+    $('voiceReply').textContent = '';
     buffer = ''; spokenRecent = ''; queued = 0; turnRunning = true; tagDone = false;
     setState('thinking'); app.send(text);
   }
-  function interrupt() { cancelSpeech(); if (turnRunning) app.stop(); turnRunning = false; buffer = ''; heard = ''; interim = ''; setState(muted ? 'muted' : 'listening'); }
+  function interrupt() { cancelSpeech(); if (turnRunning) app.stop(); turnRunning = false; buffer = ''; heard = ''; interim = ''; setState(muted ? 'muted' : 'listening'); resumeRec(); }
 
   // ---- synthesis
   function voices() { return TTS ? TTS.getVoices() : []; }
@@ -90,17 +115,23 @@
     if (NATURAL.test(v.name)) s += 100; else if (ENHANCED.test(v.name)) s += 50; else if (!v.localService) s += 20;
     return s;
   }
+  // The voices worth offering for a language: natural, enhanced or online ones; the basic system voices (they sound
+  // robotic) only when nothing better is installed.
+  function goodVoices(lang) {
+    const scored = voices().map((v) => [voiceScore(v, lang), v]).filter(([sc]) => sc >= 0).sort((a, b) => b[0] - a[0] || a[1].name.localeCompare(b[1].name));
+    const good = scored.filter(([sc]) => sc >= 20);
+    return (good.length ? good : scored).map(([, v]) => v);
+  }
   function pickVoice(lang) {
-    const all = voices(); if (!all.length) return null;
+    const list = goodVoices(lang); if (!list.length) return null;
     const want = store.get('voiceName', '');
-    const chosen = want && all.find((v) => v.name === want && voiceScore(v, lang) >= 0); if (chosen) return chosen;
-    return all.map((v) => [voiceScore(v, lang), v]).filter(([sc]) => sc >= 0).sort((a, b) => b[0] - a[0])[0]?.[1] || null;
+    return (want && list.find((v) => v.name === want)) || list[0];
   }
   const rate = () => Number(store.get('voiceRate', 1)) || 1;
   function cleanForSpeech(s) {
     return String(s)
-      .replace(/```[\s\S]*?```/g, ' ' + tr('(code)') + ' ').replace(/`([^`]*)`/g, '$1')
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, tr('(link)'))
+      .replace(/```[\s\S]*?```/g, ' ' + phrase('code') + ' ').replace(/`([^`]*)`/g, '$1')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, phrase('link'))
       .replace(/^\s{0,3}#{1,6}\s+/gm, '').replace(/^\s*[-*+]\s+/gm, '').replace(/^\s*\d+\.\s+/gm, '').replace(/^\s*\|.*\|\s*$/gm, (l) => l.split('|').filter((c) => c.trim() && !/^[\s:-]+$/.test(c)).map((c) => c.trim()).join(', '))
       .replace(/[*_>~]/g, '').replace(/[ \t]+/g, ' ').trim();
   }
@@ -123,8 +154,8 @@
   function sayOne(plain) {
     const u = new SpeechSynthesisUtterance(plain); u.lang = app.lang(); const v = pickVoice(u.lang); if (v) u.voice = v; u.rate = rate();
     queued++;
-    u.onstart = () => { spokenRecent = (spokenRecent + ' ' + plain).slice(-900); if (open) setState('speaking'); };
-    const end = () => { queued = Math.max(0, queued - 1); if (open && !queued && !turnRunning) afterSpeech(); };
+    u.onstart = () => { spokenRecent = (spokenRecent + ' ' + plain).slice(-900); if (open) { setState('speaking'); pauseRec(); } };
+    const end = () => { queued = Math.max(0, queued - 1); if (open && !queued) { if (!turnRunning) afterSpeech(); else { setState('thinking'); resumeRec(); } } };   // between sentences the microphone listens again (barge-in)
     u.onend = end; u.onerror = end;
     TTS.speak(u);
     const r = $('voiceReply'); if (r) { r.textContent += (r.textContent ? ' ' : '') + plain; r.scrollTop = r.scrollHeight; }
@@ -140,7 +171,7 @@
     } else buffer = '';
     if (text.trim()) say(text);
   }
-  function afterSpeech() { if (!open) return; heard = ''; setState(muted ? 'muted' : 'listening'); }
+  function afterSpeech() { if (!open) return; heard = ''; interim = ''; setState(muted ? 'muted' : 'listening'); resumeRec(); }
   function cancelSpeech() { queued = 0; try { TTS?.cancel(); } catch { /* ignore */ } }
 
   // ---- spoken language: Claude starts each voice reply with [lang:xx-XX], the language it heard (the recognizer may have
@@ -173,7 +204,8 @@
   function onDone() { if (!open) return; turnRunning = false; readTag(true); flushSentences(true); if (!queued) afterSpeech(); }
   function onStatus(status) {
     if (!open) return;
-    if (status === 'waiting') { turnRunning = true; say(tr('I need your approval in the chat before I can continue.')); }
+    waitingApproval = status === 'waiting';
+    if (status === 'waiting') { turnRunning = true; say(phrase('approval')); }
     else if (status === 'idle' && turnRunning && !buffer && !queued) { turnRunning = false; afterSpeech(); }
   }
 
@@ -182,12 +214,12 @@
     if (!getSR()) { app.toast(tr('Voice mode needs Google Chrome or Microsoft Edge.'), true); return; }
     open = true; muted = false; heard = ''; interim = ''; buffer = ''; turnRunning = false;
     app.pane(true); document.body.classList.add('voice-open');
-    $('voiceTranscript').textContent = ''; $('voiceReply').textContent = tr('Say something, I am listening.');
+    $('voiceTranscript').textContent = ''; $('voiceReply').textContent = phrase('hello');
     populateLangs(); syncMute(); startListening();
   }
   function closeView() {
     if (!open) return;
-    open = false; stopListening(); cancelSpeech(); clearTimeout(silenceTimer);
+    open = false; waitingApproval = false; stopListening(); cancelSpeech(); clearTimeout(silenceTimer);
     document.body.classList.remove('voice-open'); setState('idle'); app.pane(false);
   }
   function syncMute() { const b = $('voiceMute'); b.classList.toggle('on', muted); b.querySelector('span').textContent = muted ? tr('Unmute') : tr('Mute'); }
@@ -201,7 +233,7 @@
   function populateVoices() {
     const sel = $('setVoice'); if (!sel) return;
     const lang = app ? app.lang() : 'fr-FR';
-    const list = voices().map((v) => [voiceScore(v, lang), v]).filter(([sc]) => sc >= 0).sort((a, b) => b[0] - a[0] || a[1].name.localeCompare(b[1].name)).map(([, v]) => v);
+    const list = goodVoices(lang);
     const cur = store.get('voiceName', '');
     sel.innerHTML = '';
     const o = document.createElement('option'); o.value = ''; o.textContent = tr('Automatic (best available)'); sel.appendChild(o);
@@ -222,7 +254,7 @@
     const sel = $('setVoice'), r = $('setRate'), t = $('setVoiceTest');
     if (sel) sel.onchange = () => store.set('voiceName', sel.value);
     if (r) r.oninput = () => store.set('voiceRate', Number(r.value));
-    if (t) t.onclick = () => { cancelSpeech(); say(tr('Hello! This is how I will sound when I read replies to you.')); };
+    if (t) t.onclick = () => { cancelSpeech(); say(phrase('test')); };
     if (TTS) { TTS.onvoiceschanged = populateVoices; populateVoices(); }
   }
 
