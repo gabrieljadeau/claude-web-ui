@@ -56,7 +56,7 @@
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
-      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
+      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); refreshArtifacts(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
       case 'routines': S.routines = m.items; renderList(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); break;
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
@@ -65,7 +65,7 @@
       case 'whatsNew': showWhatsNew(m); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
-      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
+      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
@@ -1298,6 +1298,8 @@
 
   // -------------------------------------------------------------- artifacts page
   // Same server index as the ⌘K palette (every file Claude wrote, newest session first); the filter ignores accents.
+  let artifactsAt = 0;
+  function refreshArtifacts() { if (Date.now() - artifactsAt < 10000) return; artifactsAt = Date.now(); send({ type: 'artifacts' }); }
   function showArtifacts() { showView('artifacts'); send({ type: 'artifacts' }); renderArtifacts(); $('artifactFilter').focus({ preventScroll: true }); }
   function openArtifact(a) { if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } }
   $('artifactFilter').oninput = renderArtifacts;

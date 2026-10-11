@@ -65,6 +65,7 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 .sb-nav button { display: flex; align-items: center; gap: 10px; border: 0; background: none; border-radius: 8px; padding: 6px 8px; font-size: 14px; min-height: 32px; color: var(--ink); text-align: left; }
 .sb-nav button:hover, .sb-nav button.active { background: var(--hover); }
 .sb-nav button svg { width: 16px; height: 16px; color: var(--muted); }
+.sb-nav button .badge { margin-left: auto; font-size: 10.5px; color: var(--muted); background: var(--soft); border-radius: 5px; padding: 1px 6px; }
 .sb-nav #newBtn .nplus { width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); display: grid; place-items: center; } .sb-nav #newBtn .nplus svg { width: 10px; height: 10px; stroke-width: 2.4; color: var(--ink); }
 .sb-nav .more-nav { color: var(--muted); } .sb-nav .more-nav .chev { transform: rotate(-90deg); transition: transform .15s; } .sb-nav .more-nav.open .chev { transform: none; }
 #moreNav { display: flex; flex-direction: column; }
