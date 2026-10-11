@@ -188,6 +188,7 @@ body.space-code .welcome .suggest { display: none; }
 .composer-box .icon { border: 0; background: none; border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; color: var(--ink); }
 .composer-box .icon:hover { background: var(--soft); } .composer-box .icon svg { width: 17px; height: 17px; } .composer-box .icon.mic { color: var(--muted); }
 .composer-box .icon.rec { background: var(--danger); color: #fff; animation: pulse 1.2s infinite; }
+.composer-box .icon.hf:not(.rec) { color: var(--danger); }
 .composer-box .top { display: flex; align-items: flex-end; gap: 6px; } .composer-box .top textarea { flex: 1; }
 .composer-box .send { border: 0; background: var(--accent); color: #fff; border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; flex: none; margin-left: 4px; }
 .composer-box .send.stop { background: var(--dark); color: var(--dark-ink); } .composer-box .send svg { width: 16px; height: 16px; stroke-width: 2.2; }

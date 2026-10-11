@@ -635,7 +635,8 @@
     if (m.context && S.info) { S.info.context = m.context; renderCtx($('sCtx'), m.context); }
     if (!replay && m.cost && S.info) { S.info.cost = (S.info.cost || 0) + m.cost; $('sCost').textContent = tr('~${cost} spent', { cost: S.info.cost.toFixed(S.info.cost < 0.1 ? 3 : 2) }); }
     if (m.context || m.cost) syncUsage();
-    if (!replay && store.get('speak', false) && V.lastText) speak(V.lastText);
+    if (!replay && HF.on) { const c = activeComposer(); c.listen && (V.lastText ? speak(V.lastText, () => { if (HF.on) c.listen(); }) : c.listen()); }
+    else if (!replay && store.get('speak', false) && V.lastText) speak(V.lastText);
     V.group = null; V.turn = null; V.reply = null;
     renderPanelLight();
   }
@@ -1119,14 +1120,16 @@
       if (attachments.some((a) => !a.path)) { toast(tr('Files are still uploading — one moment.')); return; }
       const text = ta.value.trim(); if (!text && !attachments.length) return;
       onSubmit({ text, files: attachments.map((a) => a.path), queued: busy });
-      ta.value = ''; autosize(); for (const a of attachments) if (a.url) URL.revokeObjectURL(a.url); attachments.length = 0; renderChips(); if (rec.active) rec.stop();
+      ta.value = ''; autosize(); for (const a of attachments) if (a.url) URL.revokeObjectURL(a.url); attachments.length = 0; renderChips();
+      if (rec.active) { rec.stop(); if (store.get('handsFree', false)) rec.wait(); }
     }
     sendBtn.onclick = () => { if (busy) onSubmit(null); else submit(); };
-    const rec = voice(ta, interim, mic, autosize);
+    const rec = voice(ta, interim, mic, autosize, submit);
     let placeholder = opts.placeholder || tr('Write a message…');
     return {
       focus: () => ta.focus(), addFiles, slot: host.querySelector('.slot'), slotR: host.querySelector('.slot-r'), openFiles: () => fileIn.click(),
       setPlaceholder: (t) => { placeholder = t; if (!busy) ta.placeholder = t; },
+      listen: () => { rec.wait(); rec.start(); }, voiceIdle: () => rec.idle(),
       uploaded(m) { const a = attachments.find((x) => x.ref === m.ref); if (a) { a.path = m.path; renderChips(); } },
       setBusy(v) { busy = v; sendBtn.classList.toggle('stop', v); sendBtn.title = v ? tr('Stop') : tr('Send (Enter)'); sendBtn.innerHTML = icon(v ? 'stop' : 'up'); spin.hidden = !v; ta.placeholder = v ? tr('Type a message to send when Claude is done, or press Stop…') : placeholder; syncSend(); },
       setText(t) { ta.value = t; autosize(); ta.focus(); ta.setSelectionRange(t.length, t.length); },
@@ -1186,21 +1189,34 @@
   window.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); if (e.dataTransfer?.files?.length) activeComposer().addFiles(e.dataTransfer.files); });
   window.addEventListener('paste', (e) => { const f = e.clipboardData?.files; if (f?.length && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); activeComposer().addFiles(f); } });
 
-  function voice(ta, interimEl, mic, autosize) {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition; const api = { active: false, stop() {} };
+  // Hands-free (Settings › Voice): a pause sends what was said, the reply is read aloud, then the microphone listens again.
+  // HF.on is true from the moment a dictated message is sent until the user clicks the microphone to end the conversation.
+  const HF = { on: false };
+  function voice(ta, interimEl, mic, autosize, onSilence) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition; const api = { active: false, stop() {}, start() {} };
     if (!SR) { mic.disabled = true; mic.title = tr('Dictation needs Microsoft Edge or Google Chrome'); return api; }
-    const r = new SR(); r.continuous = true; r.interimResults = true; let baseText = '';
+    const r = new SR(); r.continuous = true; r.interimResults = true; let baseText = '', wanted = false, silence = 0;
+    const handsFree = () => store.get('handsFree', false);
     r.onstart = () => { api.active = true; mic.classList.add('rec'); baseText = ta.value; };
-    r.onend = () => { api.active = false; mic.classList.remove('rec'); interimEl.textContent = ''; };
-    r.onerror = (e) => { if (e.error === 'not-allowed') toast(tr('Microphone access was blocked. Allow it in the address bar and try again.'), true); };
-    r.onresult = (e) => { let fin = '', inter = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const x = e.results[i]; if (x.isFinal) fin += x[0].transcript; else inter += x[0].transcript; } if (fin) { baseText = (baseText ? baseText.replace(/\s*$/, ' ') : '') + fin.trim(); ta.value = baseText; autosize(); } interimEl.textContent = inter; };
-    mic.onclick = () => { if (api.active) { r.stop(); return; } speechSynthesis?.cancel(); r.lang = S.settings.lang || 'fr-FR'; try { r.start(); } catch { /* already started */ } };
-    api.stop = () => r.stop(); return api;
+    r.onend = () => { api.active = false; mic.classList.remove('rec'); interimEl.textContent = ''; clearTimeout(silence); if (wanted && handsFree()) setTimeout(() => { if (wanted && !api.active) api.start(); }, 300); };   // Chrome stops after a while of silence: keep listening
+    r.onerror = (e) => { if (e.error === 'not-allowed') { wanted = false; HF.on = false; toast(tr('Microphone access was blocked. Allow it in the address bar and try again.'), true); } };
+    r.onresult = (e) => {
+      let fin = '', inter = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const x = e.results[i]; if (x.isFinal) fin += x[0].transcript; else inter += x[0].transcript; }
+      if (fin) { baseText = (baseText ? baseText.replace(/\s*$/, ' ') : '') + fin.trim(); ta.value = baseText; autosize(); } interimEl.textContent = inter;
+      clearTimeout(silence); if (handsFree() && !inter && ta.value.trim()) silence = setTimeout(() => { if (api.active && ta.value.trim()) onSilence(); }, 1500);
+    };
+    api.start = () => { speechSynthesis?.cancel(); wanted = true; r.lang = S.settings.lang || 'fr-FR'; try { r.start(); } catch { /* already started */ } };
+    api.stop = () => { wanted = false; clearTimeout(silence); r.stop(); };
+    mic.onclick = () => { if (api.active || HF.on) { HF.on = false; speechSynthesis?.cancel(); api.stop(); mic.classList.remove('hf'); return; } api.start(); };
+    api.wait = () => { HF.on = true; mic.classList.add('hf'); mic.title = tr('Hands-free: click to end'); };
+    api.idle = () => { mic.classList.remove('hf'); mic.title = tr('Dictate (click to start / stop)'); };
+    return api;
   }
-  function speak(text) {
-    if (!window.speechSynthesis) return;
+  function speak(text, onEnd) {
+    if (!window.speechSynthesis) { onEnd?.(); return; }
     const plain = text.replace(/```[\s\S]*?```/g, ' (code) ').replace(/[`*#>_]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(plain.slice(0, 4000)); u.lang = S.settings.lang || 'fr-FR'; speechSynthesis.speak(u);
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(plain.slice(0, 4000)); u.lang = S.settings.lang || 'fr-FR';
+    let done = false; const end = () => { if (!done) { done = true; onEnd?.(); } }; u.onend = end; u.onerror = end; speechSynthesis.speak(u);
   }
 
   // ------------------------------------------------------------- dashboard
@@ -1555,7 +1571,7 @@
     $('setEffort').value = s.effort || '';
     $('setMode').value = s.mode || 'default'; $('setCoworkMode').value = s.coworkMode || 'auto';
     $('setBrowser').checked = s.browser !== false; $('setLang').value = s.lang || 'fr-FR'; $('setUiLang').value = store.get('uiLang', 'auto');
-    $('setSpeak').checked = store.get('speak', false); $('setArchived').checked = S.showArchived;
+    $('setSpeak').checked = store.get('speak', false); $('setHandsFree').checked = store.get('handsFree', false); $('setArchived').checked = S.showArchived;
     if (document.activeElement !== $('setName')) $('setName').value = s.name || S.user || '';
     if (document.activeElement !== $('setRepo')) $('setRepo').value = s.repo || S.repo || '';
     $('setToken').placeholder = s.hasToken ? tr('Saved (enter a new one to replace)') : 'github_pat_…';
@@ -1578,6 +1594,7 @@
   // Interface language: remembered per browser like the theme; the page reloads so every string is rebuilt.
   $('setUiLang').onchange = () => { store.set('uiLang', $('setUiLang').value); location.reload(); };
   $('setSpeak').onchange = () => { store.set('speak', $('setSpeak').checked); if (!$('setSpeak').checked) speechSynthesis?.cancel(); };
+  $('setHandsFree').onchange = () => { store.set('handsFree', $('setHandsFree').checked); if (!$('setHandsFree').checked) { HF.on = false; welcomeComposer.voiceIdle(); sessionComposer.voiceIdle(); } };
   $('setArchived').onchange = () => { S.showArchived = $('setArchived').checked; store.set('showArchived', S.showArchived); renderList(); };
   function applyTheme() {
     const t = store.get('theme', 'auto'); const d = document.documentElement.dataset;
