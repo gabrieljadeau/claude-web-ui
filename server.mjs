@@ -1540,6 +1540,7 @@ server.listen(PORT, HOST, () => {
   listing();
   openBrowser(URL_WITH_TOKEN);
   setTimeout(checkUpdate, 8000); setInterval(checkUpdate, 30 * 60 * 1000).unref();
+  setTimeout(() => artifacts().catch(() => {}), 3000);   // warm the artifact index so the first ⌘K / Artifacts page is instant
 });
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') console.error(`Port ${PORT} is already in use. Close the other window or set PORT=3738.`);

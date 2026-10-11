@@ -76,6 +76,7 @@
   <nav class="sb-nav">
     <button id="newBtn"><span class="nplus"><svg><use href="#i-plus"/></svg></span><span id="newLabel">New</span></button>
     <button id="navProjects"><svg><use href="#i-folder"/></svg><span>Projects</span></button>
+    <button id="navArtifacts"><svg><use href="#i-file"/></svg><span>Artifacts</span></button>
     <button id="navRoutines"><svg><use href="#i-clock"/></svg><span>Scheduled</span></button>
     <button id="navCustomize"><svg><use href="#i-box"/></svg><span>Customize</span></button>
     <button id="navMore" class="more-nav"><svg class="chev"><use href="#i-chev"/></svg><span>More</span></button>
@@ -230,6 +231,15 @@
       <div class="page-head"><h1>Projects</h1><span class="spacer"></span><button class="btn dark" id="addProjectBtn">Add folder</button></div>
       <p class="muted">A project is a folder on this computer. Claude works inside it for Code sessions and Cowork tasks.</p>
       <div class="plist" id="projectList"></div>
+    </div>
+  </section>
+
+  <!-- Artifacts: every file Claude wrote, across sessions -->
+  <section id="viewArtifacts" class="view page" hidden>
+    <div class="page-in">
+      <div class="page-head"><h1>Artifacts</h1><span class="spacer"></span><input id="artifactFilter" placeholder="Filter artifacts" autocomplete="off"></div>
+      <p class="muted">Files Claude created or changed in your sessions. Open one to see it in its session, or show it in the folder.</p>
+      <div class="plist" id="artifactList"></div>
     </div>
   </section>
 

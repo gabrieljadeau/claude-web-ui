@@ -16,7 +16,7 @@
     tab: store.get('tab', 'code'),            // chat | cowork | code
     view: 'welcome',                          // welcome | session | dashboard | projects | routines | routine | routineEdit | customize
     sid: null, info: null, routineId: null,
-    sessions: [], projects: [], routines: [], artifacts: [], openAfter: null, settings: {}, auth: { checked: false }, repo: '',
+    sessions: [], projects: [], routines: [], artifacts: [], artifactsLoaded: false, openAfter: null, settings: {}, auth: { checked: false }, repo: '',
     skills: null, mcp: null, plugins: null, dash: null,
     home: '', user: '', chatDir: '', version: '',
     closedGroups: new Set(store.get('closedGroups', [])),
@@ -63,7 +63,7 @@
       case 'update': S.update = m; renderUpdate(); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
-      case 'artifacts': S.artifacts = m.items; if (!$('search').hidden) renderSearch(); break;
+      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
@@ -148,6 +148,7 @@
   $('newBtn').onclick = () => showWelcome();
   $('navDashboard').onclick = () => showDashboard();
   $('navProjects').onclick = () => showProjects();
+  $('navArtifacts').onclick = () => showArtifacts();
   $('navRoutines').onclick = () => showRoutines();
   $('navCustomize').onclick = () => showCustomize();
   $('navMore').onclick = () => { const open = $('moreNav').hidden; $('moreNav').hidden = !open; $('navMore').classList.toggle('open', open); store.set('moreNav', open); };
@@ -167,7 +168,7 @@
   $('collapseBtn').onclick = () => { document.body.classList.add('collapsed'); $('expandBtn').hidden = false; };
   $('expandBtn').onclick = () => { document.body.classList.remove('collapsed'); $('expandBtn').hidden = true; };
   function markNav() {
-    const map = { dashboard: 'navDashboard', projects: 'navProjects', routines: 'navRoutines', routine: 'navRoutines', routineEdit: 'navRoutines', customize: 'navCustomize', welcome: 'newBtn' };
+    const map = { dashboard: 'navDashboard', projects: 'navProjects', artifacts: 'navArtifacts', routines: 'navRoutines', routine: 'navRoutines', routineEdit: 'navRoutines', customize: 'navCustomize', welcome: 'newBtn' };
     document.querySelectorAll('.sb-nav button').forEach((b) => b.classList.toggle('active', b.id === map[S.view]));
   }
 
@@ -273,7 +274,7 @@
   // --------------------------------------------------------------- views
   function showView(name) {
     S.view = name;
-    for (const v of ['Welcome', 'Session', 'Dashboard', 'Projects', 'Routines', 'Routine', 'RoutineEdit', 'Customize']) $('view' + v).hidden = name !== v[0].toLowerCase() + v.slice(1);
+    for (const v of ['Welcome', 'Session', 'Dashboard', 'Projects', 'Artifacts', 'Routines', 'Routine', 'RoutineEdit', 'Customize']) $('view' + v).hidden = name !== v[0].toLowerCase() + v.slice(1);
     if (name !== 'session') { S.sid = null; S.info = null; }
     markNav(); renderList();
   }
@@ -1278,6 +1279,25 @@
   }
   $('addProjectBtn').onclick = () => pickFolder(S.newFolder || S.home, (p) => send({ type: 'addProject', path: p }));
 
+  // -------------------------------------------------------------- artifacts page
+  // Same server index as the ⌘K palette (every file Claude wrote, newest session first); the filter ignores accents.
+  function showArtifacts() { showView('artifacts'); send({ type: 'artifacts' }); renderArtifacts(); $('artifactFilter').focus({ preventScroll: true }); }
+  function openArtifact(a) { if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } }
+  $('artifactFilter').oninput = renderArtifacts;
+  function renderArtifacts() {
+    const box = $('artifactList'); box.innerHTML = '';
+    const q = fold($('artifactFilter').value.trim());
+    const list = S.artifacts.filter((a) => !q || fold(base(a.path) + ' ' + a.title + ' ' + a.path).includes(q)).slice(0, 300);
+    if (!list.length) { box.innerHTML = `<div class="empty-page">${icon('file')}<div>${S.artifacts.length ? tr('No match.') : S.artifactsLoaded ? tr('No artifacts yet.') : tr('Loading…')}</div></div>`; return; }
+    for (const a of list) {
+      const r = el('div', 'prow'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
+      r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${a.title} · ${ago(a.when)} · ${shortPath(a.path)}`;
+      const o = el('button', 'btn', tr('Open')); o.onclick = () => openArtifact(a);
+      const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path });
+      r.append(o, f); box.appendChild(r);
+    }
+  }
+
   // -------------------------------------------------------------- routines
   let routineTab = 'yours';
   function showRoutines() { showView('routines'); renderRoutinesPage(); }
@@ -1541,7 +1561,7 @@
     const q = fold($('searchInput').value.trim()); const f = searchFilter;
     const hit = (t) => !q || fold(t).includes(q);
     const sessions = []; const others = []; const arts = [];
-    if (f === 'all' || f === 'artifacts') for (const a of S.artifacts) if (hit(base(a.path) + ' ' + a.title) && (q || f === 'artifacts')) arts.push({ icon: 'file', label: base(a.path), sub: `${tr(a.action)} · ${a.title} · ${ago(a.when)}`, reveal: a.path, go: () => { if (S.view === 'session' && S.info?.sid === a.sid) openFile(a.path); else { S.openAfter = a.path; openSession(a); } } });
+    if (f === 'all' || f === 'artifacts') for (const a of S.artifacts) if (hit(base(a.path) + ' ' + a.title) && (q || f === 'artifacts')) arts.push({ icon: 'file', label: base(a.path), sub: `${tr(a.action)} · ${a.title} · ${ago(a.when)}`, reveal: a.path, go: () => openArtifact(a) });
     if (f === 'all' || f === 'projects') for (const p of S.projects) if (hit(p.name + ' ' + p.path) && (q || f === 'projects')) others.push({ icon: 'folder', label: p.name, sub: tr('Project · new session'), go: () => { setTab('code'); showWelcome(p.path); } });
     if (f === 'all' || f === 'routines') for (const r of S.routines) if (hit(r.name) && (q || f === 'routines')) others.push({ icon: 'clock', label: r.name, sub: tr('Routine') + ' · ' + describeSchedule(r.schedule), go: () => showRoutine(r.id) });
     for (const s of S.sessions) if (!s.archived && s.kind !== 'routine' && (f === 'all' || f === s.kind) && hit(s.title + ' ' + s.cwd)) sessions.push({ icon: s.kind, label: s.title, sub: `${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`, go: () => openSession(s) });

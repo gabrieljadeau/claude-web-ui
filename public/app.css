@@ -107,7 +107,7 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 #expandBtn { position: absolute; top: 10px; left: 10px; z-index: 5; }
 .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .page { overflow-y: auto; } .page-in { width: min(900px, 94vw); margin: 0 auto; padding: 28px 0 40px; } .page-in.narrow { width: min(720px, 94vw); }
-.page-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.page-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; } .page-head input { min-width: 220px; }
 .page-head h1 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 0; letter-spacing: -.2px; }
 .toolbar { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; flex-wrap: wrap; } .toolbar input { min-width: 220px; }
 .cust-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; } .cust-bar .toolbar { margin: 0; flex: 1; justify-content: flex-end; } .cust-bar .toolbar input { min-width: 0; }
