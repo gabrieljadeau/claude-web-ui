@@ -327,6 +327,8 @@
     if (info.kind !== 'routine' && info.kind !== S.tab) setTab(info.kind);
     clearLog();
     for (const it of items) renderItem(it);
+    // Replayed history has no "done" markers: give every finished turn its action bar anyway.
+    if (info.status === 'idle') for (const t of log.querySelectorAll('.turn')) { const r = t.querySelector('.reply'); if (r && r.querySelector('.prose')) addTurnFoot(t, r, ''); }
     if (liveThinking) { openThinking(); V.think.querySelector('.tbody').textContent = liveThinking; }
     if (liveText) renderEvent({ type: 'delta', text: liveText });
     openPanel(panelDefault(info.kind));
@@ -615,26 +617,29 @@
     hideWorking();
     if (!m.ok && m.message && m.message !== 'error_during_execution') note(m.message, true);
     if (!V.turn) return;
-    if (!V.turn.querySelector('.turn-foot')) {
-      const foot = el('div', 'turn-foot');
-      const mini = (ic, title, fn) => { const b = el('button', 'ib'); b.title = title; b.innerHTML = icon(ic); b.onclick = fn; return b; };
-      const turn = V.turn;
-      foot.append(mini('copy', tr('Copy reply'), () => copyText(collectReply(turn))), mini('retry', tr('Retry'), () => retryTurn(turn)));
-      if (window.speechSynthesis) foot.append(mini('speaker', tr('Read aloud'), () => speak(collectReply(turn))));
-      const up = mini('thumbup', tr('Good answer'), () => { up.classList.toggle('on'); down.classList.remove('on'); if (up.classList.contains('on')) toast(tr('Thanks for the feedback.')); });
-      const down = mini('thumbdown', tr('Bad answer'), () => { down.classList.toggle('on'); up.classList.remove('on'); if (down.classList.contains('on')) openReport({ kind: 'bug', title: tr('Bad answer in "{title}"', { title: S.info?.title || '' }), primary: tr('The answer was not good:') + '\n\n' + collectReply(turn).slice(0, 1500) }); });
-      foot.append(up, down);
-      const secs = m.ms ? Math.round(m.ms / 1000) : (!replay && V.started ? Math.round((Date.now() - V.started) / 1000) : 0);
-      const meta = [secs ? fmtDur(secs) : '', m.cost != null ? '$' + m.cost.toFixed(m.cost < 0.1 ? 3 : 2) : '', m.model ? shortModel(m.model) : ''].filter(Boolean).join(' · ');
-      if (meta) foot.appendChild(el('span', 'meta', meta));
-      V.reply.appendChild(foot);
-    }
+    const secs = m.ms ? Math.round(m.ms / 1000) : (!replay && V.started ? Math.round((Date.now() - V.started) / 1000) : 0);
+    addTurnFoot(V.turn, V.reply, [secs ? fmtDur(secs) : '', m.cost != null ? '$' + m.cost.toFixed(m.cost < 0.1 ? 3 : 2) : '', m.model ? shortModel(m.model) : ''].filter(Boolean).join(' · '));
     if (m.context && S.info) { S.info.context = m.context; renderCtx($('sCtx'), m.context); }
     if (!replay && m.cost && S.info) { S.info.cost = (S.info.cost || 0) + m.cost; $('sCost').textContent = tr('~${cost} spent', { cost: S.info.cost.toFixed(S.info.cost < 0.1 ? 3 : 2) }); }
     if (m.context || m.cost) syncUsage();
     if (!replay && store.get('speak', false) && V.lastText) speak(V.lastText);
     V.group = null; V.turn = null; V.reply = null;
     renderPanelLight();
+  }
+  // Action bar under a reply (copy, retry, read aloud, thumbs), like claude.ai. Also added to replayed turns that have no "done" marker.
+  function addTurnFoot(turn, reply, meta) {
+    if (!turn || !reply || turn.querySelector('.turn-foot')) return;
+    {
+      const foot = el('div', 'turn-foot');
+      const mini = (ic, title, fn) => { const b = el('button', 'ib'); b.title = title; b.innerHTML = icon(ic); b.onclick = fn; return b; };
+      foot.append(mini('copy', tr('Copy reply'), () => copyText(collectReply(turn))), mini('retry', tr('Retry'), () => retryTurn(turn)));
+      if (window.speechSynthesis) foot.append(mini('speaker', tr('Read aloud'), () => speak(collectReply(turn))));
+      const up = mini('thumbup', tr('Good answer'), () => { up.classList.toggle('on'); down.classList.remove('on'); if (up.classList.contains('on')) toast(tr('Thanks for the feedback.')); });
+      const down = mini('thumbdown', tr('Bad answer'), () => { down.classList.toggle('on'); up.classList.remove('on'); if (down.classList.contains('on')) openReport({ kind: 'bug', title: tr('Bad answer in "{title}"', { title: S.info?.title || '' }), primary: tr('The answer was not good:') + '\n\n' + collectReply(turn).slice(0, 1500) }); });
+      foot.append(up, down);
+      if (meta) foot.appendChild(el('span', 'meta', meta));
+      reply.appendChild(foot);
+    }
   }
   const collectReply = (turn) => [...turn.querySelectorAll('.reply > .prose')].map((p) => p.dataset.raw || p.innerText).join('\n\n');
   const stripAttachLine = (t) => t.replace(/\n?📎[^\n]*$/, '').trim();
@@ -761,13 +766,17 @@
   }
   function paneHidden(n) { if (n === 'browser') send({ type: 'browserWatch', on: false }); }
   function paneAutoOpen(n) { if (!paneState[n] && !paneUserClosed[n]) togglePane(n, true); }
-  const paneUserClosed = {};
+  const paneUserClosed = {}; const workPanes = {};
   for (const n of PANES) $(PANE_EL[n]).querySelector('.pane-close').addEventListener('click', () => { paneUserClosed[n] = true; });
   function syncPaneBtns() { for (const n of PANES) $(PANE_BTN[n]).classList.toggle('on', paneState[n]); }
   // a new session was opened in the view: reset per-session content
   function panesOnSession() {
     for (const n of PANES) paneUserClosed[n] = false;
-    paneState.progress = panelDefault(S.info?.kind || 'code');
+    const kind = S.info?.kind || 'code';
+    paneState.progress = panelDefault(kind);
+    // A Chat has no folder, so no Browser, Files or Terminal pane (claude.ai shows none); they come back on the next Cowork or Code session.
+    if (kind === 'chat') { for (const n of ['browser', 'files', 'term']) { if (paneState[n]) workPanes[n] = true; paneState[n] = false; } }
+    else { for (const n of ['browser', 'files', 'term']) if (workPanes[n]) { paneState[n] = true; workPanes[n] = false; } }
     clearBrowserFrame(); B.tabs = []; B.page = null; renderTabs(); $('bUrl').value = ''; L.items = []; renderLaunch(); $('bLogs').hidden = true;
     filesReset(); termReset();
     layoutPanes();
