@@ -1303,6 +1303,9 @@
     },
     onEscape() { if (editing) { editing = null; $('editHint').hidden = true; sessionComposer.setText(''); } },
   });
+  // Like claude.ai: the mode, browser and connector chips sit inside the box, left of the text row; the model sits by the send button.
+  sessionComposer.slot.append($('sModeChip'), $('sBrowserChip'), $('sConnChip'));
+  sessionComposer.slotR.prepend($('sModelChip'));
   function startEdit(turn) { editing = turn; $('editHint').hidden = false; $('editHint').querySelector('span').textContent = tr('Editing your message. Sending will branch the conversation from there.'); sessionComposer.setText(stripAttachLine(turn.dataset.text)); }
   $('editHint').querySelector('button').onclick = () => { editing = null; $('editHint').hidden = true; sessionComposer.setText(''); };
   function renderQueue() {
