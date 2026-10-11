@@ -128,6 +128,8 @@
     'Code': ['Code', 'Code', 'Code', 'Code'],
     'Routine': ['Routine', 'Rutina', 'Routine', 'Routine'],
     'Date': ['Date', 'Fecha', 'Data', 'Datum'],
+    'manual': ['manuel', 'manual', 'manuale', 'manuell'],
+    'Skipped': ['Sautée', 'Omitida', 'Saltata', 'Übersprungen'],
     'Project': ['Projet', 'Proyecto', 'Progetto', 'Projekt'],
     'Select folder…': ['Choisir un dossier…', 'Elegir carpeta…', 'Scegli una cartella…', 'Ordner wählen…'],
     'Browse for a folder…': ['Parcourir…', 'Buscar una carpeta…', 'Sfoglia…', 'Ordner suchen…'],

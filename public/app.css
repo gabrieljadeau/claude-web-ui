@@ -672,3 +672,9 @@ a.ib { color: var(--muted); } a.ib:hover { color: var(--ink); }
 .view-tog button { border: 0; background: none; font: inherit; font-size: 12px; padding: 2px 6px; border-radius: 6px; color: var(--muted); opacity: .7; cursor: pointer; }
 .view-tog button:hover { opacity: 1; background: var(--soft); }
 .view-tog button.on { opacity: 1; color: var(--ink); font-weight: 500; }
+
+/* Routine execution log: one line of Claude's report (or the error) under each run */
+#rRuns .run .t { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+#rRuns .run .log { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60ch; }
+#rRuns .run .log:empty { display: none; }
+#rRuns .run.skipped { opacity: .6; cursor: default; }

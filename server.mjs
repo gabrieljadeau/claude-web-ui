@@ -1023,9 +1023,16 @@ async function runRoutine(r, manual = false) {
   r.runs.unshift(run); r.runs = r.runs.slice(0, 30);
   emit(rt, { type: 'user', text: r.prompt });
   sidebarDirty();
-  runTurn(rt, r.prompt).catch((err) => console.error(`  Routine "${r.name}" failed: ${err?.message || err}`)).finally(() => {
+  run.manual = !!manual;
+  let crash = '';
+  runTurn(rt, r.prompt).catch((err) => { crash = String(err?.message || err); console.error(`  Routine "${r.name}" failed: ${crash}`); }).finally(() => {
+    // Execution log: duration, error and the start of Claude's final report, shown in the routine's run list.
     const last = rt.items.filter((i) => i.type === 'done').pop();
+    const reply = rt.items.filter((i) => i.type === 'assistant').pop();
     run.sdkId = rt.sdkId; run.ok = last ? last.ok : false; run.cost = rt.cost;
+    run.ms = Date.now() - run.at;
+    run.error = run.ok ? undefined : String(crash || last?.message || 'Stopped before finishing.').slice(0, 300);
+    run.summary = reply ? String(reply.text).replace(/\s+/g, ' ').trim().slice(0, 280) : undefined;
     routineRunning.delete(r.id);
     saveState();
     broadcast({ type: 'routines', items: state.routines });
@@ -1037,7 +1044,10 @@ setInterval(() => {
   const now = Date.now();
   for (const r of state.routines) {
     if (!r.enabled || !r.nextRun || r.nextRun > now) continue;
-    if (now - r.nextRun > 6 * 3600000) { r.nextRun = computeNextRun(r, now); saveState(); continue; } // missed by a lot (computer was off): skip
+    if (now - r.nextRun > 6 * 3600000) {   // missed by a lot (computer was off): skip, and say so in the log
+      r.runs.unshift({ at: r.nextRun, skipped: true, ok: null, error: 'Skipped: the app was not running at that time.' }); r.runs = r.runs.slice(0, 30);
+      r.nextRun = computeNextRun(r, now); saveState(); broadcast({ type: 'routines', items: state.routines }); continue;
+    }
     runRoutine(r);
   }
 }, 20000);

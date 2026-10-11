@@ -1636,13 +1636,17 @@
     const r = S.routines.find((x) => x.id === S.routineId); if (!r) return;
     const box = $('rRuns'); box.innerHTML = '';
     if (!r.runs?.length) { box.innerHTML = '<div class="muted">' + tr('No runs yet. Press “Run now” to try it.') + '</div>'; return; }
+    const dur = (ms) => ms < 60000 ? Math.round(ms / 1000) + ' s' : Math.round(ms / 60000) + ' min';
     for (const run of r.runs) {
       const live = S.sessions.find((s) => s.sid === run.sid || (run.sdkId && s.sdkId === run.sdkId));
-      const st = live && live.status !== 'idle' ? 'running' : run.ok === true ? 'ok' : run.ok === false ? 'bad' : '';
-      const b = el('button', 'run'); b.innerHTML = `<span class="st ${st}"></span><span class="t"></span><span class="spacer"></span><span class="muted small"></span>`;
-      b.querySelector('.t').textContent = fmtWhen(run.at);
-      b.querySelector('.muted').textContent = st === 'running' ? tr('Running…') : (run.ok === false ? tr('Failed') : run.ok ? tr('Done') : '') + (run.cost ? ` · $${run.cost.toFixed(3)}` : '');
-      b.onclick = () => send({ type: 'open', sid: run.sdkId || run.sid, cwd: r.cwd }); box.appendChild(b);
+      const st = run.skipped ? 'hollow' : live && live.status !== 'idle' ? 'running' : run.ok === true ? 'ok' : run.ok === false ? 'bad' : '';
+      const b = el('button', 'run' + (run.skipped ? ' skipped' : '')); b.innerHTML = `<span class="st ${st}"></span><span class="t"><span class="when"></span><small class="log"></small></span><span class="spacer"></span><span class="muted small"></span>`;
+      b.querySelector('.when').textContent = fmtWhen(run.at) + (run.manual ? ' · ' + tr('manual') : '');
+      const info = st === 'running' ? tr('Running…') : run.skipped ? tr('Skipped') : [run.ok === false ? tr('Failed') : run.ok ? tr('Done') : '', run.ms ? dur(run.ms) : '', run.cost ? `$${run.cost.toFixed(3)}` : ''].filter(Boolean).join(' · ');
+      b.querySelector('.muted').textContent = info;
+      const log = run.error || run.summary || ''; b.querySelector('.log').textContent = log; b.title = log;
+      if (run.skipped) b.disabled = true; else b.onclick = () => send({ type: 'open', sid: run.sdkId || run.sid, cwd: r.cwd });
+      box.appendChild(b);
     }
   }
   $('rBack').onclick = showRoutines;
