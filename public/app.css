@@ -90,6 +90,7 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 .row.archived { opacity: .55; }
 .row { cursor: pointer; }
 .row .more { opacity: 0; margin: -3px -4px -3px 0; transition: opacity .12s; }
+.row .badge.art { transition: opacity .12s; } .row:hover .badge.art, .row.active .badge.art, .row:focus-within .badge.art { display: none; }
 .row:hover .more, .row.active .more, .row:focus-within .more, .row .more:focus-visible { opacity: 1; }
 .row .more:hover { background: var(--line); }
 .row .pin { flex: none; font-size: 11px; }

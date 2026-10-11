@@ -65,7 +65,7 @@
       case 'whatsNew': showWhatsNew(m); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
-      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
+      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; renderList(); if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
@@ -257,6 +257,8 @@
     b.tabIndex = 0; b.setAttribute('role', 'button');
     b.innerHTML = `<span class="st"></span><span class="t"><span class="tt"></span></span><button class="ib sm more" title="${tr('More actions')}">${icon('vmore')}</button>`;
     b.querySelector('.tt').textContent = s.title;
+    const nArt = S.artifacts.reduce((n, a) => n + (a.sid === s.sid ? 1 : 0), 0);
+    if (nArt) { const g = el('span', 'badge art', nArt); g.title = nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt }); b.querySelector('.more').before(g); }
     b.title = `${s.title}\n${s.status === 'waiting' ? tr('Needs your approval') + ' · ' : s.status === 'running' ? tr('Working…') + ' · ' : ''}${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`;
     b.querySelector('.st').className = 'st ' + (s.status === 'waiting' ? 'waiting' : s.status === 'running' ? 'running' : s.unread ? 'unread' : s.kind === 'chat' ? '' : 'hollow');
     b.onclick = () => openSession(s);
