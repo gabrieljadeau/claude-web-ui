@@ -54,7 +54,7 @@
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
-      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); if (S.view === 'welcome') { renderWelcomeChips(); renderJump(); } if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
+      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
       case 'routines': S.routines = m.items; if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); break;
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
@@ -91,13 +91,19 @@
     else if (a.connected === true) { cls = 'ok'; text = `Connected · ${prov}`; }
     else if (a.connected === false) { cls = 'bad'; text = 'Not connected'; }
     else { cls = 'warn'; text = 'Connection not verified'; }
-    dot.className = 'dot ' + cls; label.textContent = text;
+    dot.className = 'dot ' + cls; label.textContent = '· ' + (a.connected === true ? prov : text); $('userBtn').title = text;
     $('connStatus').textContent = text + (a.cli ? ` · ${a.cli}` : ''); $('connDetail').textContent = a.detail || '';
     $('connect').hidden = !(S.connected && a.checked && a.connected === false && !S.connectSkipped);
     $('connectDetail').textContent = a.detail || '';
     $('connectText').textContent = a.provider === 'bedrock' ? 'Claude is set up for Amazon Bedrock but the AWS credentials are missing or expired.' : 'This interface uses the same login as the claude terminal command.';
   }
-  $('userBtn').onclick = () => openSettings('connection');
+  $('userBtn').onclick = (e) => menu(e, [
+    ['Settings', () => openSettings('general')],
+    ['Connection…', () => openSettings('connection')],
+    [S.showArchived ? 'Hide archived chats' : 'Show archived chats', () => { S.showArchived = !S.showArchived; store.set('showArchived', S.showArchived); renderList(); }],
+    null,
+    ['Request a fix or a feature', () => openReport()],
+  ], S.user || 'Account');
   $('connectCheck').onclick = $('connCheck').onclick = () => { $('connectDetail').textContent = 'Checking…'; send({ type: 'authCheck' }); };
   $('connectOpen').onclick = $('connLogin').onclick = () => { send({ type: 'authLogin' }); toast('A terminal window with claude should open. Log in there, then press "Check again".', false, 6000); };
   $('connectTest').onclick = $('connTest').onclick = () => { $('connectDetail').textContent = $('connDetail').textContent = 'Sending a tiny request…'; send({ type: 'authTest' }); };
@@ -306,6 +312,7 @@
     for (const it of items) renderItem(it);
     if (liveThinking) { openThinking(); V.think.querySelector('.tbody').textContent = liveThinking; }
     if (liveText) renderEvent({ type: 'delta', text: liveText });
+    openPanel(panelDefault(info.kind));
     renderSessionHead(); renderList(); renderPanel();
     sessionComposer.setBusy(info.status !== 'idle');
     if (info.status !== 'idle') showWorking(info.status === 'waiting' ? 'Waiting for your approval' : null);
@@ -315,20 +322,25 @@
   }
   function renderSessionHead() {
     const i = S.info; if (!i) return;
-    $('sKind').textContent = KIND_LABEL[i.kind]; $('sKind').className = 'kind ' + i.kind;
-    const t = $('sTitle'); if (document.activeElement !== t) t.value = i.title || '';
-    t.style.width = Math.min(80, Math.max(10, (t.value || t.placeholder).length + 3)) + 'ch';
+    $('sKindIcon').innerHTML = `<use href="#i-${i.kind === 'routine' ? 'clock' : i.kind}"/>`; $('sKindIcon').title = KIND_LABEL[i.kind];
+    $('sTitle').textContent = i.title || 'Untitled';
     // The folder as a chip next to the title (full path on hover); nothing for Chat, which has no folder.
     const p = $('sPath'), showPath = i.kind !== 'chat' && !!i.cwd; p.hidden = !showPath;
     if (showPath) { p.querySelector('span').textContent = i.cwd === S.home ? 'Home folder' : (i.cwd.split(/[\\/]/).filter(Boolean).pop() || i.cwd); p.title = shortPath(i.cwd); }
     $('sCost').textContent = i.cost ? `~$${i.cost.toFixed(i.cost < 0.1 ? 3 : 2)} spent` : '';
     renderCtx($('sCtx'), i.context); syncUsage();
-    $('sModelChip').querySelector('span').textContent = modelLabel(i.model);
-    $('sEffortChip').querySelector('span').textContent = EFFORT_LABEL[i.effort || ''];
+    $('sModelChip').querySelector('span').textContent = modelLabel(i.model); $('sEffortText').textContent = effortShort(i.effort || '');
     $('sModeChip').querySelector('span').textContent = MODE_SHORT[i.mode] || i.mode; $('sModeChip').hidden = i.kind === 'chat';
-    $('sBrowserChip').querySelector('span').textContent = i.browser ? 'Browser: on' : 'Browser: off'; $('sBrowserChip').hidden = i.kind === 'chat';
-    $('sPin').classList.toggle('on', !!i.pinned);
+    $('sBrowserChip').querySelector('span').textContent = i.browser ? 'Browser on' : 'Browser off'; $('sBrowserChip').hidden = i.kind === 'chat';
     $('panelBtn').classList.toggle('on', document.body.classList.contains('panel-open'));
+    renderContext();
+  }
+  function renderContext() {
+    const i = S.info; const box = $('contextBody'); if (!i || !box) return; box.innerHTML = '';
+    const row = (ic, label, title, fn) => { const b = el(fn ? 'button' : 'div', 'out'); b.innerHTML = `${icon(ic)}<span class="nm"></span>`; b.querySelector('.nm').textContent = label; if (title) b.title = title; if (fn) b.onclick = fn; box.appendChild(b); };
+    if (i.kind !== 'chat' && i.cwd) row('folder', i.cwd === S.home ? 'Home folder' : baseName(i.cwd), shortPath(i.cwd), () => send({ type: 'reveal', path: i.cwd }));
+    row(i.kind === 'routine' ? 'clock' : i.kind, KIND_LABEL[i.kind] + (i.kind === 'chat' ? '' : ' · ' + (MODE_SHORT[i.mode] || i.mode)));
+    if (V?.used.size) { const u = el('div', 'used'); for (const x of V.used) u.appendChild(el('span', null, x)); box.appendChild(u); }
   }
   function renderCtx(node, ctx) {
     if (!ctx || !ctx.window) { node.hidden = true; return; }
@@ -337,18 +349,16 @@
     node.querySelector('i').style.width = pct + '%'; node.querySelector('.pct').textContent = `Context ${pct}%`;
     node.title = `Context window: ${fmtK(ctx.used)} of ${fmtK(ctx.window)} tokens used`;
   }
-  function syncUsage() { $('usageSec').hidden = $('sCtx').hidden && !$('sCost').textContent; }
-  $('sTitle').onchange = () => { const t = $('sTitle').value.trim(); if (t && S.info) { S.info.title = t; send({ type: 'rename', sid: S.sid, title: t }); } };
-  $('sTitle').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sTitle').blur(); } };
-  $('sModelChip').onclick = (e) => modelMenu(e, (v) => send({ type: 'sessionSettings', sid: S.sid, model: v }));
-  $('sEffortChip').onclick = (e) => menu(e, Object.entries(EFFORT_LABEL).map(([v, l]) => [l, () => send({ type: 'sessionSettings', sid: S.sid, effort: v })]), 'Thinking effort');
+  function syncUsage() { /* context and cost live in the header */ }
+  // The title is a dropdown like claude.ai: rename, pin, archive, delete.
+  $('sTitleBtn').onclick = (e) => { const i = S.info; if (i) sessionMenu(e, { sid: i.sid, sdkId: i.sdkId, title: i.title, pinned: i.pinned, archived: i.archived }); };
+  $('sModelChip').onclick = (e) => modelMenu(e, S.info?.model || '', S.info?.effort || '', (v) => send({ type: 'sessionSettings', sid: S.sid, model: v }), (v) => send({ type: 'sessionSettings', sid: S.sid, effort: v }));
   $('sModeChip').onclick = (e) => menu(e, Object.entries(MODE_LABEL).map(([v, l]) => [l, () => send({ type: 'sessionSettings', sid: S.sid, mode: v })]), 'Permissions');
   $('sBrowserChip').onclick = () => send({ type: 'sessionSettings', sid: S.sid, browser: !S.info?.browser });
-  $('sPin').onclick = () => { if (!S.info?.sdkId) return toast('Send a message first.'); S.info.pinned = !S.info.pinned; send({ type: 'pin', sid: S.sid, value: S.info.pinned }); renderSessionHead(); };
-  $('sMore').onclick = (e) => { const i = S.info; if (i) sessionMenu(e, { sid: i.sid, sdkId: i.sdkId, title: i.title, pinned: i.pinned, archived: i.archived }); };
-  $('panelBtn').onclick = () => openPanel(!document.body.classList.contains('panel-open'));
-  function openPanel(v) { document.body.classList.toggle('panel-open', v); store.set('panel', v); $('panelBtn').classList.toggle('on', v); if (v) renderPanel(); }
-  if (store.get('panel', true)) document.body.classList.add('panel-open');
+  $('panelBtn').onclick = () => openPanel(!document.body.classList.contains('panel-open'), true);
+  // The side panel is closed for chats and open for Cowork and Code, like claude.ai; a manual toggle is remembered per kind.
+  function openPanel(v, user) { document.body.classList.toggle('panel-open', v); if (user && S.info) store.set('panel.' + S.info.kind, v); $('panelBtn').classList.toggle('on', v); if (v) renderPanel(); }
+  function panelDefault(kind) { return store.get('panel.' + kind, kind !== 'chat'); }
   function fillModelSelect(sel, value) {
     sel.innerHTML = ''; const custom = store.get('customModel', '');
     for (const [v, l] of MODELS) { const o = el('option', null, v === '__custom' && custom ? 'Custom: ' + custom : l); o.value = v; sel.appendChild(o); }
@@ -432,7 +442,7 @@
     wrap.append(b, acts); row.appendChild(wrap); turn.appendChild(row);
     const reply = el('div', 'reply'); turn.appendChild(reply);
     log.appendChild(turn); V.turn = turn; V.reply = reply; V.group = null; V.think = null; V.live = null; V.started = Date.now();
-    if (!$('sTitle').value && document.activeElement !== $('sTitle')) $('sTitle').value = text.split('\n')[0].slice(0, 80);
+    if (S.info && !S.info.title) { S.info.title = text.split('\n')[0].slice(0, 80); $('sTitle').textContent = S.info.title; }
     keepWorkingLast(); scrollDown(true);
   }
   function addProse(text, live) {
@@ -649,8 +659,7 @@
     if (!files.length) out.appendChild(el('div', 'empty-note', 'Files Claude creates or changes appear here.'));
     for (const [p, f] of files) { const b = el('button', 'out'); b.title = p; b.innerHTML = `${icon('file')}<span class="nm"></span><span class="tag"></span>`; b.querySelector('.nm').textContent = base(p); b.querySelector('.tag').textContent = f.action || ''; b.onclick = () => openPreview(p); out.appendChild(b); }
     $('stepCount').textContent = V.stepCount || '';
-    const used = $('used'); used.innerHTML = ''; if (!V.used.size) used.appendChild(el('span', null, 'Nothing yet'));
-    for (const u of V.used) used.appendChild(el('span', null, u));
+    renderContext();
   }
   function addActRow(s) {
     const acts = $('acts'); const empty = acts.querySelector('.empty-note'); if (empty) empty.remove();
@@ -770,13 +779,15 @@
 
   // ------------------------------------------------------------ composer
   function makeComposer(host, onSubmit, opts = {}) {
-    host.innerHTML = `<div class="box"><div class="chips"></div><div class="top"><textarea rows="1" placeholder="Message Claude…"></textarea><button class="send" title="Send (Enter)">${icon('up')}</button></div><div class="interim"></div>
-      <div class="crow"><button class="icon attach" title="Attach files">${icon('plus')}</button><input type="file" multiple hidden>
-      <button class="icon mic" title="Dictate (click to start / stop)">${icon('mic')}</button><span class="slot"></span><span class="slot-r"><span class="spin" hidden title="Claude is working"></span></span></div></div>`;
+    // claude.ai layout: text on top; below it "+", the slot (Chat/Cowork, folder), then model, mic and the send button, which only shows once there is something to send.
+    host.innerHTML = `<div class="box"><div class="chips"></div><div class="top"><textarea rows="1" placeholder="Write a message…"></textarea></div><div class="interim"></div>
+      <div class="crow"><button class="icon attach" title="Add files, skills and more">${icon('plus')}</button><input type="file" multiple hidden><span class="slot"></span>
+      <span class="slot-r"><span class="spin" hidden title="Claude is working"></span><button class="icon mic" title="Dictate (click to start / stop)">${icon('mic')}</button><button class="send" title="Send (Enter)" hidden>${icon('up')}</button></span></div></div>`;
     const ta = host.querySelector('textarea'), chips = host.querySelector('.chips'), fileIn = host.querySelector('input[type=file]');
     const sendBtn = host.querySelector('.send'), mic = host.querySelector('.mic'), interim = host.querySelector('.interim'), spin = host.querySelector('.spin');
     const attachments = []; let busy = false;
-    const autosize = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 260) + 'px'; };
+    const syncSend = () => { sendBtn.hidden = !busy && !ta.value.trim() && !attachments.length; };
+    const autosize = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 260) + 'px'; syncSend(); };
     ta.addEventListener('input', autosize);
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
@@ -791,6 +802,7 @@
         c.appendChild(el('span', 'nm', a.name + (a.path ? '' : ' (uploading…)')));
         const x = el('button', null, '×'); x.title = 'Remove'; x.onclick = () => { attachments.splice(attachments.indexOf(a), 1); if (a.url) URL.revokeObjectURL(a.url); renderChips(); }; c.appendChild(x); chips.appendChild(c);
       }
+      syncSend();
     }
     function addFiles(list) {
       for (const f of list) {
@@ -799,8 +811,16 @@
         const r = new FileReader(); r.onload = () => send({ type: 'upload', ref, name: f.name, data: String(r.result).split(',')[1] || '' }); r.readAsDataURL(f);
       }
     }
-    host.querySelector('.attach').onclick = () => fileIn.click();
+    // "+" menu like claude.ai: files, project folder, skills, connectors, plugins.
+    host.querySelector('.attach').onclick = (e) => {
+      const items = [{ label: 'Add files or photos', icon: 'attach', right: IS_MAC ? '⌘U' : 'Ctrl+U', fn: () => fileIn.click() }];
+      if (opts.welcome) items.push({ label: 'Add to project', icon: 'folder', arrow: true, fn: () => { if (S.tab === 'chat') { store.set('chatKind', 'cowork'); setTab('cowork'); } $('projectChip').click(); } });
+      items.push({ sep: true }, { label: 'Skills', icon: 'skill', arrow: true, fn: () => skillsMenu(e, (name) => { ta.value = `/${name} ` + ta.value; autosize(); ta.focus(); }) },
+        { label: 'Connectors', icon: 'plug', arrow: true, fn: () => showCustomize('mcp') }, { label: 'Add plugins', icon: 'puzzle', fn: () => showCustomize('plugins') });
+      richMenu(e, items);
+    };
     fileIn.onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
+    host.addFilesDialog = () => fileIn.click();
     function submit() {
       if (attachments.some((a) => !a.path)) { toast('Files are still uploading — one moment.'); return; }
       const text = ta.value.trim(); if (!text && !attachments.length) return;
@@ -809,23 +829,29 @@
     }
     sendBtn.onclick = () => { if (busy) onSubmit(null); else submit(); };
     const rec = voice(ta, interim, mic, autosize);
+    let placeholder = opts.placeholder || 'Write a message…';
     return {
-      focus: () => ta.focus(), addFiles, slot: host.querySelector('.slot'), slotR: host.querySelector('.slot-r'),
-      setPlaceholder: (t) => (ta.placeholder = t),
+      focus: () => ta.focus(), addFiles, slot: host.querySelector('.slot'), slotR: host.querySelector('.slot-r'), openFiles: () => fileIn.click(),
+      setPlaceholder: (t) => { placeholder = t; if (!busy) ta.placeholder = t; },
       uploaded(m) { const a = attachments.find((x) => x.ref === m.ref); if (a) { a.path = m.path; renderChips(); } },
-      setBusy(v) { busy = v; sendBtn.classList.toggle('stop', v); sendBtn.title = v ? 'Stop' : 'Send (Enter)'; sendBtn.innerHTML = icon(v ? 'stop' : 'up'); spin.hidden = !v; ta.placeholder = v ? 'Type a message to send when Claude is done, or press Stop…' : (opts.placeholder || 'Message Claude…'); },
+      setBusy(v) { busy = v; sendBtn.classList.toggle('stop', v); sendBtn.title = v ? 'Stop' : 'Send (Enter)'; sendBtn.innerHTML = icon(v ? 'stop' : 'up'); spin.hidden = !v; ta.placeholder = v ? 'Type a message to send when Claude is done, or press Stop…' : placeholder; syncSend(); },
       setText(t) { ta.value = t; autosize(); ta.focus(); ta.setSelectionRange(t.length, t.length); },
       getText: () => ta.value,
     };
   }
+  function skillsMenu(e, onPick) {
+    const open = () => { const list = (S.skills || []).slice(0, 14); if (!list.length) { toast('No skills installed yet. Add some under Customize.'); showCustomize('skills'); return; } richMenu(e, list.map((s) => ({ label: s.name, desc: (s.description || '').slice(0, 70), fn: () => onPick(s.name) })).concat([{ sep: true }, { label: 'Manage skills', arrow: true, fn: () => showCustomize('skills') }])); };
+    if (S.skills === null) { send({ type: 'skills' }); onceHandlers.push((m) => { if (m.type === 'skills') open(); }); } else open();
+  }
   let pendingFirst = null;
   const welcomeComposer = makeComposer($('welcomeComposer'), (m) => {
     if (!m || m.queued) return;
+    store.set('chatKind', S.tab === 'cowork' ? 'cowork' : 'chat');
     const kind = S.tab; const cwd = kind === 'chat' ? '' : S.newFolder;
     if (kind !== 'chat') { if (!cwd) return toast('Choose a project folder first.', true); store.set('lastFolder', cwd); send({ type: 'addProject', path: cwd }); }
     pendingFirst = m;
     send({ type: 'new', kind, cwd, mode: kind === 'chat' ? undefined : (S.newMode || undefined), model: S.newModel ?? undefined, effort: S.newEffort ?? undefined });
-  });
+  }, { welcome: true, placeholder: 'How can I help you today?' });
   // queue: messages typed while Claude is still working; sent in order when the turn ends ("Send now" interrupts).
   const queues = new Map(); let editing = null;
   const sessionComposer = makeComposer($('sessionComposer'), (m) => {
@@ -855,9 +881,9 @@
     }
   }
   function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files }); }
-  // chips under the composers (model, effort, permissions), like claude.ai
-  welcomeComposer.slot.append($('projectChip'), $('modeChip')); welcomeComposer.slotR.prepend($('modelChip'), $('effortChip'));
-  sessionComposer.slot.append($('sModeChip'), $('sBrowserChip')); sessionComposer.slotR.prepend($('sModelChip'), $('sEffortChip'));
+  // Inside the welcome composer: Chat/Cowork toggle and project folder on the left, the model picker on the right (like claude.ai).
+  welcomeComposer.slot.append($('kindSeg'), $('projectChip')); welcomeComposer.slotR.prepend($('modelChip'));
+  $('welcomeChips').remove();
   const activeComposer = () => (S.view === 'session' ? sessionComposer : welcomeComposer);
   let dragDepth = 0;
   window.addEventListener('dragenter', (e) => { if (e.dataTransfer?.types?.includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
@@ -1217,6 +1243,7 @@
     if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
     else if (e.key === '/' && !typing && !mod) { e.preventDefault(); openSearch(); }
     else if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); showWelcome(); }
+    else if (mod && e.key.toLowerCase() === 'u') { e.preventDefault(); activeComposer().openFiles(); }
     else if (mod && e.shiftKey && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); if (S.view === 'session' && S.info) deleteSession({ sid: S.info.sid, sdkId: S.info.sdkId, title: S.info.title }); }
     else if (mod && e.key.toLowerCase() === '.') { e.preventDefault(); if (S.view === 'session') openPanel(!document.body.classList.contains('panel-open')); }
     else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (!$('preview').hidden) { $('preview').hidden = true; previewPath = null; } }
@@ -1227,7 +1254,6 @@
   function setPage(p) { document.querySelectorAll('.set-nav button[data-p]').forEach((b) => b.classList.toggle('active', b.dataset.p === p)); document.querySelectorAll('.set-page').forEach((x) => (x.hidden = x.dataset.page !== p)); }
   document.querySelectorAll('.set-nav button[data-p]').forEach((b) => (b.onclick = () => setPage(b.dataset.p)));
   document.querySelectorAll('.set-nav button[data-go]').forEach((b) => (b.onclick = () => { $('settingsDlg').close(); showCustomize(b.dataset.go); }));
-  $('settingsBtn').onclick = () => openSettings('general');
   $('settingsClose').onclick = () => $('settingsDlg').close();
   function applySettingsToUi() {
     const s = S.settings || {};
@@ -1286,13 +1312,30 @@
 
   // ---------------------------------------------------------------- utils
   function menu(e, entries, head) {
-    const m = $('menu'); m.innerHTML = '';
+    const m = $('menu'); m.innerHTML = ''; m.classList.remove('rich');
     if (head) m.appendChild(el('div', 'mh', head));
-    for (const ent of entries) { if (!ent) { m.appendChild(el('div', 'sep')); continue; } const [label, fn, cls, keys] = ent; const b = el('button', cls || '', label); if (keys) b.appendChild(el('kbd', '', keys)); b.onclick = () => { m.hidden = true; fn(); }; m.appendChild(b); }
+    for (const ent of entries) { if (!ent) { m.appendChild(el('div', 'sep')); continue; } const [label, fn, cls, keys] = ent; const b = el('button', cls || '', label); if (keys) b.appendChild(el('kbd', '', keys)); b.onclick = (ev) => { ev.stopPropagation(); m.hidden = true; fn(); }; m.appendChild(b); }
+    placeMenu(e, m, entries.length);
+  }
+  // Menu with descriptions, check marks and right-hand text (the claude.ai model picker).
+  function richMenu(e, items) {
+    const m = $('menu'); m.innerHTML = ''; m.classList.add('rich');
+    for (const it of items) {
+      if (it.sep) { m.appendChild(el('div', 'sep')); continue; }
+      const b = el('button', 'mi' + (it.check ? ' on' : ''));
+      b.innerHTML = `${it.icon ? icon(it.icon) : ''}<span class="mt"><span class="ml"></span><small class="md"></small></span><span class="mr"></span>`;
+      b.querySelector('.ml').textContent = it.label; b.querySelector('.md').textContent = it.desc || ''; if (!it.desc) b.querySelector('.md').remove();
+      b.querySelector('.mr').innerHTML = (it.right ? `<span class="rt"></span>` : '') + (it.check ? icon('check') : '') + (it.arrow ? '<span class="arr">›</span>' : '');
+      if (it.right) b.querySelector('.rt').textContent = it.right;
+      b.onclick = (ev) => { ev.stopPropagation(); m.hidden = true; it.fn(); }; m.appendChild(b);
+    }
+    placeMenu(e, m, items.length);
+  }
+  function placeMenu(e, m, n) {
     m.hidden = false;
-    const r = e.currentTarget?.getBoundingClientRect?.();
-    const h = m.offsetHeight || entries.length * 34 + 20;
-    let x = Math.min(r ? r.left : e.clientX, window.innerWidth - 240), y = r ? r.bottom + 4 : e.clientY;
+    const r = (e.currentTarget && e.currentTarget.getBoundingClientRect) ? e.currentTarget.getBoundingClientRect() : (e.target?.closest?.('button')?.getBoundingClientRect?.());
+    const h = m.offsetHeight || n * 34 + 20, w = m.offsetWidth || 240;
+    let x = Math.min(r ? r.left : e.clientX, window.innerWidth - w - 8), y = r ? r.bottom + 4 : e.clientY;
     if (y + h > window.innerHeight - 8) y = Math.max(8, (r ? r.top : e.clientY) - h - 4);
     m.style.left = x + 'px'; m.style.top = y + 'px';
     setTimeout(() => document.addEventListener('click', () => (m.hidden = true), { once: true }), 0);
