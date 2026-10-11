@@ -8,15 +8,21 @@ Everything runs on your own computer, on `127.0.0.1` only. Nothing is exposed to
 
 ## Features
 
-- **Chat** with live streaming answers and visible tool activity (commands, file edits, results)
-- **History**: list past chats for the current folder and resume them (shared with the `claude` terminal history)
-- **Approvals**: Allow / Always allow / Refuse before Claude edits files, runs commands or acts in the browser
-- **Working folder** picker
-- **Model** picker: default, Opus, Sonnet, Haiku, or any custom model ID (e.g. a Bedrock inference profile)
-- **Modes**: ask before changes, auto-accept file edits, or plan only
-- **Drag and drop** files (or paste, or the paperclip button) to attach them to a message
-- **Voice input** (French, Spanish, English) and optional **read replies aloud**
+- **Familiar chat layout**: recent chats on the left (grouped by date, searchable, rename and delete), the conversation in the middle, a welcome screen for new chats
+- **Progress panel** on the right, so you can follow what the agent is doing:
+  - **Progress**: Claude's plan and to-do list, ticked off live
+  - **Outputs**: files Claude created or changed, with a preview (web pages, images, Markdown, text)
+  - **Steps**: every action as it happens (files read, commands run, browser actions, helper agents), with details and results
+  - **Used in this chat**: the tools involved
+- **In the chat**: streaming answers, a collapsible "thinking" block, compact step summaries ("Read 2 files, ran a command"), code blocks with a copy button, tables
+- **Edit and retry** any message: the conversation continues from that point
+- **Approvals**: Allow, Always allow for this chat, or Deny before Claude edits files, runs commands or uses the browser
+- **Working folder** with the Windows folder picker and a list of recent folders
+- **Model**, **thinking effort** and **approval mode** right in the message box
+- **Drag and drop** files (or paste, or use +) to attach them, with image thumbnails
+- **Voice input** (French, Spanish, English) and **read replies aloud**
 - **Browser actions**: Claude can open Microsoft Edge, navigate, click and fill pages (via [Playwright MCP](https://github.com/microsoft/playwright-mcp))
+- Light and dark mode, black and white design
 
 ## Requirements
 
