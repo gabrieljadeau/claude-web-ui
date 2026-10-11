@@ -720,12 +720,24 @@
       if (s.row && !s.row.nextElementSibling?.classList.contains('shots')) { const strip = el('div', 'shots'); for (const p of m.images) { const im = el('img'); im.src = fileUrl(p); im.title = base(p); im.onclick = (e) => { e.stopPropagation(); openPreview(p); }; strip.appendChild(im); } s.row.after(strip); }
     }
     if (s.row) s.row.className = 'step ' + s.status + (s.parent ? ' sub' : '');
+    if (!m.isError && s.name === 'Write' && /\.(html?|svg)$/i.test(s.input?.file_path || '') && s.row) inlinePage(s);
     if (V.group) refreshGroup(V.group);
     updatePlan(s.name, s.input, m.content);
     updateActRow(s);
     if (s.file && F.active === s.file && paneState.files) openFile(s.file);
     if (!replay && !s.parent) showWorking(tr('Thinking'));
     renderPanelLight();
+  }
+  // A page Claude writes (HTML / SVG) shows right in the conversation, like a claude.ai artifact; hover for full screen.
+  function inlinePage(s) {
+    const p = s.input.file_path, anchor = s.row.closest('.steps') || s.row;
+    if (anchor.parentNode.querySelector(`.inline-page[data-path="${CSS.escape(p)}"]`)) { anchor.parentNode.querySelector(`.inline-page[data-path="${CSS.escape(p)}"] iframe`).src = fileUrl(p) + '&v=' + Date.now(); return; }
+    const box = el('div', 'inline-page'); box.dataset.path = p;
+    box.innerHTML = `<div class="ip-bar"><span class="ip-name"></span><span class="spacer"></span><button class="ib sm ip-full" title="${tr('Full screen')}">${icon('expand') || '⤢'}</button></div>`;
+    box.querySelector('.ip-name').textContent = base(p);
+    const f = el('iframe'); f.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups'); f.src = fileUrl(p) + '&v=' + Date.now(); f.loading = 'lazy'; box.appendChild(f);
+    box.querySelector('.ip-full').onclick = (e) => { e.stopPropagation(); if (document.fullscreenElement) document.exitFullscreen(); else box.requestFullscreen?.(); };
+    anchor.after(box); if (V.group?.el === anchor || anchor.classList.contains('steps')) V.group = null;   // later steps start a new group under the page
   }
   function updatePlan(name, input, result) {
     if (name === 'TodoWrite' && Array.isArray(input?.todos) && result === null) V.todos = input.todos.map((t) => ({ content: t.content || t.subject || '', status: t.status || 'pending', active: t.activeForm }));
