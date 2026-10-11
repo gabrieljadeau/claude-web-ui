@@ -67,6 +67,7 @@
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
       case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; renderList(); if (S.view === 'projects') renderProjects(); if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
+      case 'connectors': if (connMenuWanted) { connMenuWanted = false; connectorMenu(m.items || [], m.defaults || []); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { window.Voice?.onStatus(m.status); S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
       case 'ev': if (S.info && m.sid === S.info.sid) renderEvent(m.ev); else if (m.ev.type === 'done' && m.ev.ok === false && m.ev.message) toast(m.ev.message, true); else if (m.ev.type === 'permission') toast(tr('A chat needs your approval. See the sidebar or the Dashboard.'), false, 5000); break;
@@ -105,6 +106,11 @@
     $('newsDlg').showModal();
   }
   $('newsClose').onclick = () => $('newsDlg').close();
+  // Welcome screen: the "how it works" card (hidden per browser once dismissed) and the map of the app.
+  $('howto').hidden = store.get('howtoHidden', false);
+  $('howtoHide').onclick = () => { store.set('howtoHidden', true); $('howto').hidden = true; };
+  $('mapBtn').onclick = () => $('mapDlg').showModal();
+  $('mapClose').onclick = () => $('mapDlg').close();
   function renderUpdate() {
     const u = S.update || {}, b = $('updateBtn');
     if (u.manual) { if (u.error) toast(tr('Could not check for updates: {e}', { e: u.error }), true); else if (!u.available) toast(tr('You have the latest version')); }
@@ -382,6 +388,7 @@
     $('sModelChip').querySelector('span').textContent = modelLabel(i.model); $('sEffortText').textContent = effortShort(i.effort || '');
     $('sModeChip').querySelector('span').textContent = MODE_SHORT[i.mode] || i.mode; $('sModeChip').hidden = i.kind === 'chat';
     $('sBrowserChip').querySelector('span').textContent = i.browser ? tr('Browser on') : tr('Browser off'); $('sBrowserChip').hidden = i.kind === 'chat';
+    $('sConnChip').querySelector('span').textContent = connectorsLabel(i.connectors || []); $('sConnChip').hidden = i.kind !== 'chat';
     syncPaneBtns();
     renderContext();
   }
@@ -407,6 +414,36 @@
   $('sModelChip').onclick = (e) => modelMenu(e, S.info?.model || '', S.info?.effort || '', (v) => send({ type: 'sessionSettings', sid: S.sid, model: v }), (v) => send({ type: 'sessionSettings', sid: S.sid, effort: v }));
   $('sModeChip').onclick = (e) => menu(e, Object.entries(MODE_LABEL).map(([v, l]) => [l, () => send({ type: 'sessionSettings', sid: S.sid, mode: v })]), tr('Permissions'));
   $('sBrowserChip').onclick = () => send({ type: 'sessionSettings', sid: S.sid, browser: !S.info?.browser });
+  // Connectors (Gmail, calendar…) a chat may use: a multi-select menu that stays open while toggling; the choice is kept per session.
+  let connMenuWanted = false;
+  const connShort = (n) => n.replace(/^claude\.ai /, '');
+  function connectorsLabel(list) { return !list.length ? tr('No connectors') : list.length <= 2 ? list.map(connShort).join(', ') : tr('{n} connectors', { n: list.length }); }
+  $('sConnChip').onclick = () => { connMenuWanted = true; send({ type: 'connectors' }); };
+  function connectorMenu(items, defaults) {
+    const m = $('menu'); const sel = new Set(S.info?.connectors || []);
+    const apply = () => send({ type: 'sessionSettings', sid: S.sid, connectors: [...sel] });
+    const draw = () => {
+      m.innerHTML = ''; m.classList.add('rich');
+      m.appendChild(el('div', 'mh', tr('Connectors')));
+      if (!items.length) m.appendChild(el('div', 'mh', tr('No connectors found. Send a message first, then open this menu again.')));
+      const row = (label, on, fn, desc) => {
+        const b = el('button', 'mi' + (on ? ' on' : ''));
+        b.innerHTML = `<span class="mt"><span class="ml"></span>${desc ? '<small class="md"></small>' : ''}</span><span class="mr">${on ? icon('check') : ''}</span>`;
+        b.querySelector('.ml').textContent = label; if (desc) b.querySelector('.md').textContent = desc;
+        b.onclick = (ev) => { ev.stopPropagation(); fn(); draw(); }; m.appendChild(b);
+      };
+      for (const c of items) row(connShort(c.name), sel.has(c.name), () => { if (sel.has(c.name)) sel.delete(c.name); else sel.add(c.name); apply(); });
+      if (items.length) {
+        m.appendChild(el('div', 'sep'));
+        row(tr('All'), false, () => { for (const c of items) sel.add(c.name); apply(); });
+        row(tr('None'), false, () => { sel.clear(); apply(); });
+        row(tr('Default for new chats'), false, () => { send({ type: 'settings', connectors: [...sel] }); toast(tr('Saved as the default for new chats')); }, tr('Currently: {list}', { list: connectorsLabel(defaults) }));
+      }
+    };
+    draw();
+    placeMenu({ currentTarget: $('sConnChip') }, m, items.length + 4);
+    menuOpening = false;   // the menu opened after a round trip, so the click that asked for it is long gone
+  }
   function fillModelSelect(sel, value) {
     sel.innerHTML = ''; const custom = store.get('customModel', '');
     for (const [v, l] of MODELS) { const o = el('option', null, v === '__custom' && custom ? tr('Custom: {id}', { id: custom }) : l); o.value = v; sel.appendChild(o); }

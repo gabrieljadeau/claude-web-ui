@@ -150,6 +150,22 @@ body.space-code .welcome h1 .logo { width: 20px; height: 20px; }
 body.space-code .welcome .composer-box { margin: auto auto 0; width: min(var(--wrap), 100%); }
 body.space-code .welcome .suggest { display: none; }
 .suggest { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
+.howto { width: min(680px, 100%); margin: 36px auto 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 16px 18px 10px; }
+.howto[hidden] { display: none; }
+.howto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+.howto-grid > div { display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.howto-grid b { color: var(--ink); font-weight: 600; } .howto-grid code { font: 12px var(--mono); }
+.howto-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+@media (max-width: 640px) { .howto-grid { grid-template-columns: 1fr; } }
+dialog.map { width: min(820px, 94vw); }
+.map-svg { width: 100%; height: auto; display: block; font-family: inherit; }
+.map-svg { stroke: none; } .map-svg .m-box { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; } .map-svg .m-main { fill: var(--soft); stroke: var(--accent); }
+.map-svg .m-cloud { fill: var(--accent-soft); stroke: var(--accent); } .map-svg .m-store { fill: var(--side); } .map-svg .m-dash { stroke-dasharray: 4 3; }
+.map-svg text { text-anchor: middle; fill: var(--ink); stroke: none; font-weight: 400; } .map-svg .m-left { text-anchor: start; }
+.map-svg .m-title { font-size: 13.5px; font-weight: 600; } .map-svg .m-sub { font-size: 12px; fill: var(--muted); } .map-svg .m-small { font-size: 11px; fill: var(--muted); }
+.map-svg .m-note { font-size: 10.5px; fill: var(--accent); } .map-svg .m-tiny { font-size: 10px; fill: var(--muted); }
+.map-svg .m-line { stroke: var(--muted); stroke-width: 1.2; fill: none; } .map-svg .m-dotted { stroke-dasharray: 3 3; } .map-svg .m-fill { fill: var(--muted); }
+.map-legend { margin: 12px 4px 0; line-height: 1.5; }
 .sbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 6px 12px; font-size: 13.5px; color: var(--ink); }
 .sbtn svg { width: 14px; height: 14px; color: var(--muted); } .sbtn:hover { background: var(--soft); }
 .kind-seg { margin-right: 4px; } .kind-seg button { width: auto; padding: 0 10px; font-size: 13px; height: 26px; }
