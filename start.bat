@@ -13,15 +13,23 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist node_modules (
-  echo Installing dependencies, this happens only once...
-  call npm install --no-fund --no-audit
-  if errorlevel 1 (
+where git >nul 2>nul
+if not errorlevel 1 if exist .git (
+  echo Checking for updates...
+  git pull --ff-only --quiet
+  if errorlevel 1 echo  Could not update automatically. Starting the version you have.
+)
+
+if not exist node_modules echo Installing dependencies, this happens only once...
+call npm install --no-fund --no-audit --silent
+if errorlevel 1 (
+  if not exist node_modules (
     echo.
     echo  npm install failed. Check your internet connection and try again.
     pause
     exit /b 1
   )
+  echo  Could not refresh dependencies. Starting anyway.
 )
 
 node scripts/launch.mjs

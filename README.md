@@ -72,6 +72,7 @@ The interface uses exactly the same login as the `claude` terminal command. At s
 The app checks GitHub at start and every half hour. When a newer version exists, a **Relaunch to update**
 button appears at the bottom of the sidebar: it pulls the latest code, installs dependencies and restarts the
 server; the page reconnects on its own. **Settings › General › Check for updates** looks right away.
+On Windows, `start.bat` also pulls the latest version every time it starts.
 
 By hand, in the `claude-web-ui` folder:
 
