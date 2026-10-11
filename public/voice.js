@@ -98,9 +98,23 @@
       .replace(/^\s{0,3}#{1,6}\s+/gm, '').replace(/^\s*[-*+]\s+/gm, '').replace(/^\s*\d+\.\s+/gm, '').replace(/^\s*\|.*\|\s*$/gm, (l) => l.split('|').filter((c) => c.trim() && !/^[\s:-]+$/.test(c)).map((c) => c.trim()).join(', '))
       .replace(/[*_>~]/g, '').replace(/[ \t]+/g, ' ').trim();
   }
+  // Chrome's online (Google) voices stop after ~15 s of audio: keep each utterance short, cutting at punctuation.
+  function chunks(plain, max = 170) {
+    const out = []; let rest = plain;
+    while (rest.length > max) {
+      let cut = -1; for (const re of [/[.!?…]\s/g, /[;:,]\s/g, /\s/g]) { let m; while ((m = re.exec(rest)) && m.index < max) cut = m.index + 1; if (cut > 20) break; cut = -1; }
+      if (cut < 0) cut = max;
+      out.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+    }
+    if (rest) out.push(rest);
+    return out;
+  }
   function say(text) {
     if (!TTS) return;
-    const plain = cleanForSpeech(text); if (!plain) return;
+    const whole = cleanForSpeech(text); if (!whole) return;
+    for (const part of chunks(whole)) sayOne(part);
+  }
+  function sayOne(plain) {
     const u = new SpeechSynthesisUtterance(plain); u.lang = app.lang(); const v = pickVoice(u.lang); if (v) u.voice = v; u.rate = rate();
     queued++;
     u.onstart = () => { spokenRecent = (spokenRecent + ' ' + plain).slice(-900); if (open) setState('speaking'); };
@@ -139,7 +153,7 @@
     open = true; muted = false; heard = ''; buffer = ''; turnRunning = false;
     const v = $('voiceView'); v.hidden = false; document.body.classList.add('voice-open');
     $('voiceTranscript').textContent = ''; $('voiceReply').textContent = tr('Say something, I am listening.');
-    syncMute(); startListening();
+    populateLangs(); syncMute(); startListening();
   }
   function closeView() {
     if (!open) return;
@@ -164,6 +178,16 @@
     for (const v of list) { const x = document.createElement('option'); x.value = v.name; x.textContent = (NATURAL.test(v.name) ? '★ ' : '') + `${v.name} (${v.lang})`; if (v.name === cur) x.selected = true; sel.appendChild(x); }
     const r = $('setRate'); if (r) r.value = rate();
   }
+  function populateLangs() {
+    const sel = $('voiceLang'), src = $('setLang'); if (!sel || !src) return;
+    sel.innerHTML = ''; for (const o of src.options) { const x = document.createElement('option'); x.value = o.value; x.textContent = o.textContent; sel.appendChild(x); }
+    sel.value = app.lang();
+  }
+  function changeLang(code) {
+    app.setLang(code); cancelSpeech(); heard = ''; $('voiceTranscript').textContent = '';
+    if (recWanted) { try { rec.stop(); } catch { /* restarts with the new language via onend */ } }
+    populateVoices();
+  }
   function wireSettings() {
     const sel = $('setVoice'), r = $('setRate'), t = $('setVoiceTest');
     if (sel) sel.onchange = () => store.set('voiceName', sel.value);
@@ -176,6 +200,7 @@
     app = bridge;
     $('voiceClose').onclick = closeView; $('voiceEnd').onclick = closeView; $('voiceText').onclick = closeView;
     $('voiceMute').onclick = toggleMute; $('voiceOrb').onclick = orbTap;
+    $('voiceLang').onchange = (e) => changeLang(e.target.value);
     window.addEventListener('keydown', (e) => { if (open && e.key === 'Escape') closeView(); });
     wireSettings();
   }

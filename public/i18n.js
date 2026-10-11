@@ -7,6 +7,7 @@
   const LOCALE = { en: 'en-US', fr: 'fr-FR', es: 'es-ES', it: 'it-IT', de: 'de-DE' };
   const T = {
     // ---- voice mode
+    'Language for speaking and listening': ['Langue pour parler et écouter', 'Idioma para hablar y escuchar', 'Lingua per parlare e ascoltare', 'Sprache zum Sprechen und Zuhören'],
     'Voice mode': ["Mode vocal", "Modo de voz", "Modalità vocale", "Sprachmodus"],
     'Listening…': ["Je vous écoute…", "Te escucho…", "Ti ascolto…", "Ich höre zu…"],
     'Thinking…': ["Je réfléchis…", "Pensando…", "Sto pensando…", "Ich überlege…"],

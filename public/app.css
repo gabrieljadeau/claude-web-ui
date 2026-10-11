@@ -597,3 +597,10 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 .vbtn.on { color: var(--danger); border-color: var(--danger); }
 .composer-box .icon.vm { color: var(--muted); } .composer-box .icon.vm:hover { color: var(--accent); }
 #setRate { width: 160px; accent-color: var(--accent); }
+
+/* ---- floating working indicator: a sticky, zero-height strip at the top of the chat holding the pill */
+.working-wrap { position: sticky; top: 0; height: 0; z-index: 3; display: flex; justify-content: center; overflow: visible; }
+.working-wrap[hidden] { display: none; }
+.working.bar { position: relative; top: -14px; margin: 0; gap: 8px; padding: 6px 14px 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); font-size: 13px; white-space: nowrap; max-width: calc(100% - 32px); }
+.working.bar .lbl { overflow: hidden; text-overflow: ellipsis; }
+.vlang { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 13px; color: var(--ink); margin-right: 4px; }

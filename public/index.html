@@ -137,7 +137,7 @@
     </header>
     <div class="s-body">
       <div class="s-col">
-        <div id="chat"><div class="wrap" id="log"></div><button class="jump-btn" id="jumpBtn" title="Jump to latest" hidden><svg><use href="#i-up" style="transform:rotate(180deg);transform-origin:center"/></svg></button></div>
+        <div id="chat"><div class="working-wrap" id="workingBar" hidden></div><div class="wrap" id="log"></div><button class="jump-btn" id="jumpBtn" title="Jump to latest" hidden><svg><use href="#i-up" style="transform:rotate(180deg);transform-origin:center"/></svg></button></div>
         <div class="composer"><div class="wrap">
           <div class="queue" id="queue"></div>
           <div class="edit-hint" id="editHint" hidden><span></span><button class="btn link">Cancel (Esc)</button></div>
@@ -496,7 +496,7 @@
 
 <!-- Voice mode: a spoken conversation; see public/voice.js -->
 <div id="voiceView" class="voice" hidden data-state="idle">
-  <div class="voice-top"><span class="voice-status" id="voiceStatus"></span><span class="spacer"></span><button class="ib" id="voiceText" title="Back to text"><svg><use href="#i-chat"/></svg></button><button class="ib" id="voiceClose" title="End voice mode"><svg><use href="#i-close"/></svg></button></div>
+  <div class="voice-top"><span class="voice-status" id="voiceStatus"></span><span class="spacer"></span><select id="voiceLang" class="vlang" title="Language for speaking and listening"></select><button class="ib" id="voiceText" title="Back to text"><svg><use href="#i-chat"/></svg></button><button class="ib" id="voiceClose" title="End voice mode"><svg><use href="#i-close"/></svg></button></div>
   <div class="voice-mid"><button class="orb" id="voiceOrb" title="Tap to interrupt, or to send what you said"><span></span><span></span><span></span></button></div>
   <div class="voice-reply" id="voiceReply"></div>
   <div class="voice-transcript" id="voiceTranscript"></div>

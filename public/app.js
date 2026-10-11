@@ -511,15 +511,21 @@
   }
   // working indicator (spinner + what Claude is doing right now)
   let workTimer = null;
+  // A floating pill at the top of the chat (the conversation keeps updating underneath), not a row at the bottom.
   function showWorking(label) {
     if (!V) return;
-    if (!V.working) { V.working = el('div', 'working'); V.working.innerHTML = '<span class="wstar" aria-hidden="true">' + icon('star') + '</span><span class="lbl"></span><span class="t"></span>'; V.workStart = Date.now(); clearInterval(workTimer); workTimer = setInterval(() => { if (V?.working) V.working.querySelector('.t').textContent = fmtDur(Math.round((Date.now() - V.workStart) / 1000)); }, 1000); }
+    const bar = $('workingBar');
+    if (!V.working) {
+      V.working = bar; bar.innerHTML = '<div class="working bar"><span class="wstar" aria-hidden="true">' + icon('star') + '</span><span class="lbl"></span><span class="t"></span></div>'; bar.hidden = false;
+      V.workStart = Date.now(); clearInterval(workTimer);
+      workTimer = setInterval(() => { if (V?.working) V.working.querySelector('.t').textContent = fmtDur(Math.round((Date.now() - V.workStart) / 1000)); }, 1000);
+    }
     if (label) V.current = label;
     V.working.querySelector('.lbl').textContent = V.current || tr('Working');
-    keepWorkingLast(); scrollDown(); renderPanelLight();
+    renderPanelLight();
   }
-  function hideWorking() { if (V?.working) { V.working.remove(); V.working = null; clearInterval(workTimer); renderPanelLight(); } }
-  function keepWorkingLast() { if (V?.working) (V.reply || log).appendChild(V.working); }
+  function hideWorking() { if (V?.working) { V.working.hidden = true; V.working = null; clearInterval(workTimer); renderPanelLight(); } }
+  function keepWorkingLast() { /* the indicator floats above the log; nothing to move */ }
 
   // steps (tool calls): compact groups in the chat, full detail in the panel
   const base = (p) => String(p || '').split(/[\\/]/).filter(Boolean).pop() || String(p || '');
@@ -1760,6 +1766,7 @@
   window.Voice?.init({
     lang: () => S.settings.lang || LOCALE || 'fr-FR',
     toast,
+    setLang(code) { S.settings.lang = code; const sel = $('setLang'); if (sel) sel.value = code; send({ type: 'settings', lang: code }); },
     stop() { if (S.view === 'session' && S.sid) send({ type: 'stop', sid: S.sid }); },
     send(text) {
       if (S.view === 'session' && S.info) {
