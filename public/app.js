@@ -56,7 +56,7 @@
         setUser(m.user); renderAuth(); applySettingsToUi(); renderWelcomeChips();
         if (S.view === 'welcome') showWelcome(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); if (S.view === 'dashboard') send({ type: 'dashboard' });
         break;
-      case 'sessions': S.sessions = m.items; S.projects = m.projects; renderList(); refreshArtifacts(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
+      case 'sessions': S.sessions = m.items; S.projects = m.projects; $('projectCount').textContent = S.projects.length; $('projectCount').hidden = !S.projects.length; renderList(); refreshArtifacts(); if (S.view === 'welcome') renderWelcomeChips(); if (S.view === 'projects') renderProjects(); if (S.view === 'routine') renderRoutineRuns(); if (S.view === 'dashboard') send({ type: 'dashboard' }); break;
       case 'routines': S.routines = m.items; renderList(); if (S.view === 'routines') renderRoutinesPage(); if (S.view === 'routine') showRoutine(S.routineId, true); break;
       case 'settings': S.settings = m.settings; if (m.repo) S.repo = m.repo; if (m.user) { setUser(m.user); if (S.view === 'welcome') showWelcome(); } applySettingsToUi(); renderWelcomeChips(); break;
       case 'auth': S.auth = m.auth; renderAuth(); break;
