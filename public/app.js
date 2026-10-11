@@ -1651,8 +1651,10 @@
     let x = Math.min(r ? r.left : e.clientX, window.innerWidth - w - 8), y = r ? r.bottom + 4 : e.clientY;
     if (y + h > window.innerHeight - 8) y = Math.max(8, (r ? r.top : e.clientY) - h - 4);
     m.style.left = x + 'px'; m.style.top = y + 'px';
-    setTimeout(() => document.addEventListener('click', () => (m.hidden = true), { once: true }), 0);
+    menuOpening = true; // the click that opened the menu is still bubbling; the document handler below lets it through
   }
+  let menuOpening = false;
+  document.addEventListener('click', (ev) => { if (menuOpening) { menuOpening = false; return; } if (!$('menu').contains(ev.target)) $('menu').hidden = true; });
   function toast(text, err, ms) { const t = el('div', 'toast' + (err ? ' err' : ''), text); $('toasts').appendChild(t); setTimeout(() => t.remove(), ms || (err ? 7000 : 3500)); }
   function ago(ts) { const d = Date.now() - ts; if (d < 60000) return tr('just now'); if (d < 3600000) return tr('{n} min ago', { n: Math.floor(d / 60000) }); if (d < 86400000) return tr('{n} h ago', { n: Math.floor(d / 3600000) }); if (d < 7 * 86400000) return tr('{n} d ago', { n: Math.floor(d / 86400000) }); return new Date(ts).toLocaleDateString(LOCALE); }
   function fmtWhen(ts) { const d = new Date(ts); const same = d.toDateString() === new Date().toDateString(); return (same ? tr('today') + ' ' : d.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' }) + ' ') + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }); }
