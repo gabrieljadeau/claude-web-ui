@@ -1896,7 +1896,8 @@
   function paintSel() { [...$('searchResults').querySelectorAll('.row')].forEach((x, i) => x.classList.toggle('sel', i === selIdx)); }
   // e.code names the QWERTY position, so on an AZERTY Mac "M" is not KeyM: map the physical key to the letter it prints.
   const keyByCode = {}; navigator.keyboard?.getLayoutMap?.().then((m) => m.forEach((v, c) => { if (/^[vmd]$/i.test(v)) keyByCode[c] = 'Key' + v.toUpperCase(); })).catch(() => {});
-  const voiceKey = (e) => { const k = keyByCode[e.code] || (Object.keys(keyByCode).length ? '' : e.code); return ['KeyV', 'KeyM', 'KeyD'].includes(k) ? k : ''; };
+  // Without the layout map (Safari, Firefox), the AZERTY "M" key sits where QWERTY has ";": accept both positions.
+  const voiceKey = (e) => { const k = keyByCode[e.code] || (Object.keys(keyByCode).length ? '' : e.code === 'Semicolon' ? 'KeyM' : e.code); return ['KeyV', 'KeyM', 'KeyD'].includes(k) ? k : ''; };
   $('keysBtn').onclick = () => $('keysDlg').showModal(); $('keysClose').onclick = () => $('keysDlg').close();
   window.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey; const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable;
