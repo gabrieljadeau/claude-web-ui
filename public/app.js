@@ -319,6 +319,7 @@
     for (const it of items) renderItem(it);
     if (liveThinking) { openThinking(); V.think.querySelector('.tbody').textContent = liveThinking; }
     if (liveText) renderEvent({ type: 'delta', text: liveText });
+    openPanel(panelDefault(info.kind));
     renderSessionHead(); renderList(); renderPanel();
     sessionComposer.setBusy(info.status !== 'idle');
     if (info.status !== 'idle') showWorking(info.status === 'waiting' ? 'Waiting for your approval' : null);
