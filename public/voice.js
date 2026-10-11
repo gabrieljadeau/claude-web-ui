@@ -268,5 +268,5 @@
     wireSettings();
   }
 
-  window.Voice = { init, open: openView, close: closeView, isOpen: () => open, onDelta, onAssistantText, onDone, onStatus, pickVoice, rate, populateVoices, get supported() { return !!getSR(); } };
+  window.Voice = { init, open: openView, close: closeView, isOpen: () => open, toggleMute, talkNow, onDelta, onAssistantText, onDone, onStatus, pickVoice, rate, populateVoices, get supported() { return !!getSR(); } };
 })();

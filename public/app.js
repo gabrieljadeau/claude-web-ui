@@ -1232,7 +1232,7 @@
     // claude.ai layout: text on top; below it "+", the slot (Chat/Cowork, folder), then model, mic and the send button, which only shows once there is something to send.
     host.innerHTML = `<div class="box"><div class="chips"></div><div class="top"><textarea rows="1" placeholder="${tr('Write a message…')}"></textarea></div><div class="interim"></div>
       <div class="crow"><button class="icon attach" title="${tr('Add files, skills and more')}">${icon('plus')}</button><input type="file" multiple hidden><span class="slot"></span>
-      <span class="slot-r"><span class="spin" hidden title="${tr('Claude is working')}"></span><button class="icon vm" title="${tr('Voice mode')}">${icon('voice')}</button><button class="icon mic" title="${tr('Dictate (click to start / stop)')}">${icon('mic')}</button><button class="send" title="${tr('Send (Enter)')}" hidden>${icon('up')}</button></span></div></div>`;
+      <span class="slot-r"><span class="spin" hidden title="${tr('Claude is working')}"></span><button class="icon vm" title="${tr('Voice mode')} (⌥V)">${icon('voice')}</button><button class="icon mic" title="${tr('Dictate (click to start / stop)') + ' (⌥D)'}">${icon('mic')}</button><button class="send" title="${tr('Send (Enter)')}" hidden>${icon('up')}</button></span></div></div>`;
     const ta = host.querySelector('textarea'), chips = host.querySelector('.chips'), fileIn = host.querySelector('input[type=file]');
     const sendBtn = host.querySelector('.send'), mic = host.querySelector('.mic'), interim = host.querySelector('.interim'), spin = host.querySelector('.spin');
     const attachments = []; let busy = false;
@@ -1371,7 +1371,7 @@
     api.stop = () => { wanted = false; clearTimeout(silence); r.stop(); };
     mic.onclick = () => { if (api.active || HF.on) { HF.on = false; speechSynthesis?.cancel(); api.stop(); mic.classList.remove('hf'); return; } api.start(); };
     api.wait = () => { HF.on = true; mic.classList.add('hf'); mic.title = tr('Hands-free: click to end'); };
-    api.idle = () => { mic.classList.remove('hf'); mic.title = tr('Dictate (click to start / stop)'); };
+    api.idle = () => { mic.classList.remove('hf'); mic.title = tr('Dictate (click to start / stop)') + ' (⌥D)'; };
     return api;
   }
   function speak(text, onEnd) {
@@ -1902,6 +1902,15 @@
     else if (mod && e.key.toLowerCase() === 'u') { e.preventDefault(); activeComposer().openFiles(); }
     else if (mod && e.shiftKey && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); if (S.view === 'session' && S.info) deleteSession({ sid: S.info.sid, sdkId: S.info.sdkId, title: S.info.title }); }
     else if (mod && e.key.toLowerCase() === '.') { e.preventDefault(); if (S.view === 'session') openPanel(!paneState.progress, true); }
+    // Voice shortcuts (Option + key, read from e.code since Option changes the character on a Mac):
+    // ⌥V voice mode on/off, ⌥M mute / unmute the microphone in voice mode, ⌥D dictate into the composer, ⌥Space talk now.
+    else if (e.altKey && !mod && ['KeyV', 'KeyM', 'KeyD', 'Space'].includes(e.code)) {
+      e.preventDefault(); const V = window.Voice;
+      if (e.code === 'KeyV') { if (V?.isOpen()) V.close(); else document.querySelector('#viewSession:not([hidden]) .composer-box .icon.vm, #viewWelcome:not([hidden]) .composer-box .icon.vm')?.click(); }
+      else if (e.code === 'KeyM') { if (V?.isOpen()) V.toggleMute(); }
+      else if (e.code === 'Space') { if (V?.isOpen()) V.talkNow(); }
+      else document.querySelector('#viewSession:not([hidden]) .composer-box .icon.mic, #viewWelcome:not([hidden]) .composer-box .icon.mic')?.click();
+    }
     else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (fullPane) setFull(fullPane, false); if (S.selecting && !S.suggesting) setSelecting(false); }
   });
 
