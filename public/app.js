@@ -1894,10 +1894,12 @@
     paintSel();
   }
   function paintSel() { [...$('searchResults').querySelectorAll('.row')].forEach((x, i) => x.classList.toggle('sel', i === selIdx)); }
+  $('keysBtn').onclick = () => $('keysDlg').showModal(); $('keysClose').onclick = () => $('keysDlg').close();
   window.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey; const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable;
     if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
     else if (e.key === '/' && !typing && !mod) { e.preventDefault(); openSearch(); }
+    else if (e.key === '?' && !typing && !mod) { e.preventDefault(); $('keysDlg').showModal(); }
     else if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); showWelcome(); }
     else if (mod && e.key.toLowerCase() === 'u') { e.preventDefault(); activeComposer().openFiles(); }
     else if (mod && e.shiftKey && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); if (S.view === 'session' && S.info) deleteSession({ sid: S.info.sid, sdkId: S.info.sdkId, title: S.info.title }); }

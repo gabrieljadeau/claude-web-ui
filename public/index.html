@@ -97,7 +97,7 @@
       <svg class="chev"><use href="#i-chev"/></svg>
     </button>
     <button class="ib" id="reportBtn" title="Request a fix or a feature"><svg><use href="#i-life"/></svg></button>
-    <button class="ib" id="searchBtn" title="Search (⌘K)"><svg><use href="#i-search"/></svg></button>
+    <button class="ib" id="searchBtn" title="Search (⌘K)"><svg><use href="#i-search"/></svg></button><button class="ib" id="keysBtn" title="Keyboard shortcuts (?)" style="font-weight:600;font-size:14px">?</button>
   </div>
 </aside>
 
@@ -587,6 +587,24 @@
   <div class="dlg-head">Edit skill · <span id="skeName"></span></div>
   <div class="dlg-body form"><textarea id="skeText" rows="22" spellcheck="false" style="font-family:var(--mono,ui-monospace,monospace);font-size:12.5px"></textarea></div>
   <div class="dlg-foot"><button class="btn" id="skeClose">Cancel</button><button class="btn dark" id="skeSave">Save</button></div>
+</dialog>
+
+<!-- Keyboard shortcuts -->
+<dialog id="keysDlg" style="width:min(460px,94vw)">
+  <div class="dlg-head">Keyboard shortcuts</div>
+  <div class="dlg-body keys-list">
+    <b>General</b>
+    <div><span>Search</span><kbd>⌘K</kbd></div><div><span>Search (when not typing)</span><kbd>/</kbd></div>
+    <div><span>New conversation</span><kbd>⌘N</kbd></div><div><span>Attach files</span><kbd>⌘U</kbd></div>
+    <div><span>Show / hide progress panel</span><kbd>⌘.</kbd></div><div><span>Delete this conversation</span><kbd>⌘⇧⌫</kbd></div>
+    <div><span>Close / cancel</span><kbd>Esc</kbd></div><div><span>This list</span><kbd>?</kbd></div>
+    <b>Composer</b>
+    <div><span>Send</span><kbd>Enter</kbd></div><div><span>New line</span><kbd>⇧Enter</kbd></div><div><span>Edit last message</span><kbd>↑</kbd></div>
+    <b>Voice</b>
+    <div><span>Voice mode on / off</span><kbd>⌥V</kbd></div><div><span>Mute / unmute the microphone</span><kbd>⌥M</kbd></div>
+    <div><span>Dictate into the composer</span><kbd>⌥D</kbd></div><div><span>Interrupt and talk now</span><kbd>⌥Space</kbd></div>
+  </div>
+  <div class="dlg-foot"><button class="btn" id="keysClose">Close</button></div>
 </dialog>
 
 <!-- Add connector -->

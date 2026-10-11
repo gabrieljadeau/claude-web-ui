@@ -685,3 +685,9 @@ a.ib { color: var(--muted); } a.ib:hover { color: var(--ink); }
 .inline-page .ip-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: linear-gradient(var(--panel), transparent); opacity: 0; transition: opacity .15s; pointer-events: none; font-size: 12px; color: var(--muted); }
 .inline-page:hover .ip-bar { opacity: 1; } .inline-page .ip-bar button { pointer-events: auto; background: var(--panel); border: 1px solid var(--line); }
 .inline-page:fullscreen { border-radius: 0; } .inline-page:fullscreen iframe { height: 100vh; } .inline-page:fullscreen .ip-bar { opacity: 1; }
+
+/* Keyboard shortcuts list */
+.keys-list { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.keys-list b { margin: 10px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; } .keys-list b:first-child { margin-top: 0; }
+.keys-list div { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.keys-list kbd { font: 12px ui-monospace, monospace; background: var(--soft); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
