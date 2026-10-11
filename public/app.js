@@ -76,6 +76,7 @@
       case 'picked': onPicked(m); break;
       case 'uploaded': if (m.ref === 'skill') { send({ type: 'skillAdd', file: m.path }); } else { welcomeComposer.uploaded(m); sessionComposer.uploaded(m); } break;
       case 'skills': S.skills = m.items; renderSkills(); break;
+      case 'skillText': if ($('skillEditDlg').dataset.dir === m.dir) { $('skeText').value = m.text; $('skeText').disabled = false; } break;
       case 'mcp': S.mcp = m.items; renderMcp(); break;
       case 'plugins': S.plugins = m; renderPlugins(); break;
       case 'dashboard': S.dash = m; if (S.view === 'dashboard') renderDashboard(); if (S.view === 'welcome') renderHomeDash(); break;
@@ -1700,10 +1701,20 @@
       const r = el('div', 'card c'); r.style.cursor = 'default'; r.innerHTML = `<span class="icon">${icon('skill')}</span><span class="t"><b></b><div></div><small></small></span><span class="acts"></span>`;
       r.querySelector('b').textContent = s.name; r.querySelector('small').textContent = s.scope === 'user' ? tr('Personal') : tr('Project: {scope}', { scope: s.scope }); r.querySelector('div').textContent = s.description; r.querySelector('div').title = s.dir;
       const use = el('button', 'btn', tr('Use')); use.onclick = () => { setTab(S.tab === 'chat' ? 'code' : S.tab); showWelcome(); welcomeComposer.setText(`/${s.name} `); };
+      if (s.disabled) { r.style.opacity = '.55'; r.querySelector('small').textContent += ' · ' + tr('Disabled'); }
+      const edit = el('button', 'btn', tr('Edit')); edit.onclick = () => openSkillEdit(s);
+      const upd = el('button', 'btn', tr('Update with Claude')); upd.onclick = () => { setTab('code'); S.newFolder = S.home; showWelcome(); welcomeComposer.setText(`Update the Claude Code skill in ${s.dir}/SKILL.md${s.disabled ? '.off' : ''}: `); };
+      const tog = el('button', 'btn', s.disabled ? tr('Enable') : tr('Disable')); tog.onclick = () => send({ type: 'skillToggle', dir: s.dir, enabled: s.disabled });
       const x = el('button', 'ib'); x.innerHTML = icon('trash'); x.title = tr('Delete skill'); x.onclick = () => { if (confirm(tr('Delete skill “{name}”?', { name: s.name }))) send({ type: 'skillDelete', dir: s.dir }); };
-      r.querySelector('.acts').append(use, x); box.appendChild(r);
+      r.querySelector('.acts').append(...(s.disabled ? [] : [use]), edit, upd, tog, x); box.appendChild(r);
     }
   }
+  function openSkillEdit(s) {
+    const d = $('skillEditDlg'); d.dataset.dir = s.dir; $('skeName').textContent = s.name;
+    $('skeText').value = tr('Loading…'); $('skeText').disabled = true; d.showModal(); send({ type: 'skillRead', dir: s.dir });
+  }
+  $('skeClose').onclick = () => $('skillEditDlg').close();
+  $('skeSave').onclick = () => { const d = $('skillEditDlg'); if ($('skeText').disabled) return; send({ type: 'skillSave', dir: d.dataset.dir, text: $('skeText').value }); d.close(); };
   $('skillAddBtn').onclick = () => $('skillDlg').showModal();
   $('skClose').onclick = () => $('skillDlg').close();
   $('skUrlBtn').onclick = () => { const v = $('skUrl').value.trim(); if (v) { send({ type: 'skillAdd', source: v }); toast(tr('Installing skill…')); $('skillDlg').close(); } };

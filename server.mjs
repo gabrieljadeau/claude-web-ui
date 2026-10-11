@@ -1064,11 +1064,13 @@ async function readSkillDir(dir, scope) {
   let names = [];
   try { names = await fsp.readdir(dir); } catch { return out; }
   for (const name of names) {
-    const file = path.join(dir, name, 'SKILL.md');
+    // A disabled skill keeps its folder but its SKILL.md is renamed SKILL.md.off, so Claude Code no longer loads it.
+    const on = path.join(dir, name, 'SKILL.md'), off = on + '.off';
+    const disabled = !fs.existsSync(on) && fs.existsSync(off);
     try {
-      const md = await fsp.readFile(file, 'utf8');
+      const md = await fsp.readFile(disabled ? off : on, 'utf8');
       const fm = frontmatter(md);
-      out.push({ name: fm.name || name, dir: path.join(dir, name), description: (fm.description || md.replace(/^---[\s\S]*?---/, '').trim().split('\n')[0] || '').slice(0, 400), scope });
+      out.push({ name: fm.name || name, dir: path.join(dir, name), description: (fm.description || md.replace(/^---[\s\S]*?---/, '').trim().split('\n')[0] || '').slice(0, 400), scope, disabled });
     } catch { /* not a skill */ }
   }
   return out;
@@ -1112,12 +1114,19 @@ async function addSkill({ source, file }) {
   fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
   return name;
 }
-async function deleteSkill(dir) {
+function skillDir(dir) {
   const d = path.resolve(String(dir || ''));
   const allowed = [SKILLS_DIR, ...state.projects.map((p) => path.join(p.path, '.claude', 'skills'))];
-  if (!allowed.some((a) => d.startsWith(a + path.sep)) || !fs.existsSync(path.join(d, 'SKILL.md'))) throw new Error('Not a skill folder.');
-  await fsp.rm(d, { recursive: true, force: true });
+  if (!allowed.some((a) => path.dirname(d) === a)) throw new Error('Not a skill folder.');
+  const on = path.join(d, 'SKILL.md'), off = on + '.off';
+  if (fs.existsSync(on)) return { d, file: on, on, off, disabled: false };
+  if (fs.existsSync(off)) return { d, file: off, on, off, disabled: true };
+  throw new Error('Not a skill folder.');
 }
+async function deleteSkill(dir) { await fsp.rm(skillDir(dir).d, { recursive: true, force: true }); }
+async function toggleSkill(dir, enabled) { const s = skillDir(dir); if (enabled === s.disabled) await fsp.rename(s.file, enabled ? s.on : s.off); }
+async function readSkill(dir) { return fsp.readFile(skillDir(dir).file, 'utf8'); }
+async function saveSkill(dir, text) { await fsp.writeFile(skillDir(dir).file, String(text || '')); }
 
 async function listPlugins() {
   const r = await runCmd('claude', ['plugin', 'list', '--json'], 20000);
@@ -1445,6 +1454,20 @@ wss.on('connection', async (ws) => {
         case 'skillAdd': {
           try { const name = await addSkill(msg); send({ type: 'toast', text: `Skill “${name}” installed.` }); }
           catch (err) { send({ type: 'error', message: String(err.message || err) }); }
+          send({ type: 'skills', items: await listSkills() });
+          break;
+        }
+        case 'skillToggle': {
+          try { await toggleSkill(msg.dir, !!msg.enabled); } catch (err) { send({ type: 'error', message: String(err.message || err) }); }
+          send({ type: 'skills', items: await listSkills() });
+          break;
+        }
+        case 'skillRead': {
+          try { send({ type: 'skillText', dir: msg.dir, text: await readSkill(msg.dir) }); } catch (err) { send({ type: 'error', message: String(err.message || err) }); }
+          break;
+        }
+        case 'skillSave': {
+          try { await saveSkill(msg.dir, msg.text); send({ type: 'toast', text: 'Skill saved.' }); } catch (err) { send({ type: 'error', message: String(err.message || err) }); }
           send({ type: 'skills', items: await listSkills() });
           break;
         }
