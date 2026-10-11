@@ -1,0 +1,2 @@
+[     278ms] ReferenceError: L is not defined
+    at https://www.aemet.es/js/maps/maps.js:343:125

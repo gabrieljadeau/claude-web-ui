@@ -1,0 +1,1258 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - button "Aceptar cookies" [ref=e6] [cursor=pointer]
+      - generic [ref=e7]: Información sobre uso de cookies
+    - paragraph [ref=e9]:
+      - text: Este sitio web utiliza cookies propias y de terceros para mejorar la experiencia de navegación, y ofrecer contenidos y funcionalidades de interés. Para más información sobre las cookies utilizadas consulta nuestra
+      - link "política de cookies" [ref=e10] [cursor=pointer]:
+        - /url: /en/politica_cookies
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - heading "Agencia Estatal de Meteorología" [level=1] [ref=e14]
+        - list [ref=e15]:
+          - listitem [ref=e16]:
+            - link "C - Go to content" [ref=e17] [cursor=pointer]:
+              - /url: "#contenido"
+          - listitem [ref=e18]:
+            - link "0 - Web accessibility" [ref=e19] [cursor=pointer]:
+              - /url: /en/accesibilidad
+          - listitem [ref=e20]:
+            - link "1 - Homepage" [ref=e21] [cursor=pointer]:
+              - /url: /en/portada
+          - listitem [ref=e22]:
+            - link "2 - Site map" [ref=e23] [cursor=pointer]:
+              - /url: /en/mapaweb
+          - listitem [ref=e24]:
+            - link "3 - Web help" [ref=e25] [cursor=pointer]:
+              - /url: /en/ayuda
+          - listitem [ref=e26]:
+            - link "4 - Contact" [ref=e27] [cursor=pointer]:
+              - /url: /en/contactar
+          - listitem [ref=e28]:
+            - link "5 - Towns" [ref=e29] [cursor=pointer]:
+              - /url: /en/eltiempo/prediccion/municipios
+          - listitem [ref=e30]:
+            - link "6 - Warnings" [ref=e31] [cursor=pointer]:
+              - /url: /en/eltiempo/prediccion/avisos
+      - generic [ref=e33]:
+        - link "State Meteorological Agency" [ref=e34] [cursor=pointer]:
+          - /url: /en/portada
+        - link "Ministerio para la Transición Ecológica y el Reto Demográfico. (it will open in a new window)" [ref=e35] [cursor=pointer]:
+          - /url: https://www.miteco.gob.es
+        - img "State Meteorological Agency" [ref=e37]
+      - list [ref=e39]:
+        - listitem [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42] [cursor=pointer]: Welcome
+            - list
+        - listitem [ref=e44]:
+          - generic [ref=e47]:
+            - textbox "Enter text" [ref=e48]
+            - button "Submit" [ref=e49] [cursor=pointer]
+    - list [ref=e53]:
+      - listitem [ref=e54]:
+        - link "Weather" [ref=e55] [cursor=pointer]:
+          - /url: /en/eltiempo
+      - listitem [ref=e56]:
+        - link "Climate services" [ref=e57] [cursor=pointer]:
+          - /url: /en/serviciosclimaticos
+      - listitem [ref=e58]:
+        - link "Know us" [ref=e59] [cursor=pointer]:
+          - /url: /en/conocenos
+      - listitem [ref=e60]:
+        - link "R&D+I" [ref=e61] [cursor=pointer]:
+          - /url: /en/idi
+      - listitem [ref=e62]:
+        - link "Knowing more" [ref=e63] [cursor=pointer]:
+          - /url: /en/conocermas
+      - listitem [ref=e64]:
+        - link "Public employment and scholarships" [ref=e65] [cursor=pointer]:
+          - /url: /en/empleo_y_becas
+      - listitem [ref=e66]:
+        - link "Open data" [ref=e67] [cursor=pointer]:
+          - /url: /en/datos_abiertos
+      - listitem [ref=e68]:
+        - link "Virtual office" [ref=e69] [cursor=pointer]:
+          - /url: /en/sede_electronica
+  - generic [ref=e70]:
+    - list [ref=e73]:
+      - listitem [ref=e74]:
+        - img "METEOALERTA" [ref=e75]
+      - listitem [ref=e76]:
+        - link "Sun 11" [ref=e77] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion/avisos?w=hoy
+      - listitem [ref=e80]:
+        - link "Mon 12" [ref=e81] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion/avisos?w=mna
+      - listitem [ref=e84]:
+        - link "Tue 13" [ref=e85] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion/avisos?w=pmna
+    - generic [ref=e89]:
+      - generic [ref=e91]:
+        - link "Homepage" [ref=e92] [cursor=pointer]:
+          - /url: /en/portada
+        - text: ›
+        - link "Weather" [ref=e93] [cursor=pointer]:
+          - /url: /en/eltiempo
+        - text: ›
+        - link "Forecast" [ref=e94] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion
+        - text: ›
+        - link "Towns" [ref=e95] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion/municipios
+        - text: ›
+        - link "Valladolid" [ref=e96] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion/municipios/valladolid-id47186
+        - text: ›
+        - link "Horas" [ref=e97] [cursor=pointer]:
+          - /url: /en/eltiempo/prediccion/municipios/horas/valladolid-id47186
+      - generic [ref=e98]:
+        - list [ref=e99]:
+          - listitem [ref=e100]:
+            - link [ref=e101] [cursor=pointer]:
+              - /url: /en/eltiempo/prediccion/municipios/horas/valladolid-id47186/ayuda
+              - img "+Info" [ref=e102]
+        - heading "Weather forecast by locations. Valladolid (Valladolid)" [level=2] [ref=e103]
+        - generic [ref=e104]:
+          - list [ref=e106]:
+            - listitem [ref=e107]:
+              - link "7-Day weather forecast" [ref=e108] [cursor=pointer]:
+                - /url: /en/eltiempo/prediccion/municipios/valladolid-id47186
+            - listitem [ref=e109]:
+              - link "Hourly weather forecast" [ref=e110] [cursor=pointer]:
+                - /url: /en/eltiempo/prediccion/municipios/horas/valladolid-id47186
+            - listitem [ref=e111]:
+              - link "The weather on your website" [ref=e112] [cursor=pointer]:
+                - /url: /en/eltiempo/widgets/municipios/valladolid-id47186
+            - listitem [ref=e113]:
+              - link "Mapa" [ref=e114] [cursor=pointer]:
+                - /url: /en/eltiempo/prediccion/espana?k=cle&p=47
+          - list [ref=e116]:
+            - listitem [ref=e117]:
+              - link "Table" [ref=e118] [cursor=pointer]:
+                - /url: /en/eltiempo/prediccion/municipios/horas/tabla/valladolid-id47186
+            - listitem [ref=e119]:
+              - link [ref=e120] [cursor=pointer]:
+                - /url: /en/eltiempo/prediccion/municipios/horas/valladolid-id47186
+                - strong [ref=e121]: Chart
+        - generic [ref=e123]:
+          - text: "Capital: Valladolid (altitude: 690 m)"
+          - generic [ref=e124]: "Latitude: 41° 39' 8'' N - Longitude: 4° 43' 24'' W -"
+          - text: "Position:"
+          - link "See location" [ref=e125] [cursor=pointer]:
+            - /url: http://maps.google.es/?q=%4041.6523277700%2C-4.7233492400&t=p&ll=41.6523277700%2C-4.7233492400&spn=0.182837%2C0.291824&z=11&output=embed
+          - text: "Warning zone: Meseta de Valladolid"
+        - generic [ref=e126]:
+          - generic [ref=e127]:
+            - link "Download the XML archive of the hourly weather forecast for Valladolid" [ref=e129] [cursor=pointer]:
+              - /url: /xml/municipios_h/localidad_h_47186.xml
+            - link "XML" [ref=e131] [cursor=pointer]:
+              - /url: /xml/municipios_h/localidad_h_47186.xml
+          - paragraph [ref=e132]:
+            - checkbox "Relative humidity (%)" [checked] [ref=e133]
+            - text: Relative humidity (%)
+            - checkbox "Feels like temperature (°C)" [checked] [ref=e134]
+            - text: Feels like temperature (°C)
+            - checkbox "Temperature (°C)" [checked] [ref=e135]
+            - text: Temperature (°C)
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - generic [ref=e139]:
+                - generic "No hazard" [ref=e141] [cursor=pointer]:
+                  - link "No hazard" [ref=e142]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e144] [cursor=pointer]:
+                  - link "No hazard" [ref=e145]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e147] [cursor=pointer]:
+                  - link "No hazard" [ref=e148]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e150] [cursor=pointer]:
+                  - link "No hazard" [ref=e151]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e153] [cursor=pointer]:
+                  - link "No hazard" [ref=e154]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e156] [cursor=pointer]:
+                  - link "No hazard" [ref=e157]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e159] [cursor=pointer]:
+                  - link "No hazard" [ref=e160]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e162] [cursor=pointer]:
+                  - link "No hazard" [ref=e163]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e165] [cursor=pointer]:
+                  - link "No hazard" [ref=e166]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e168] [cursor=pointer]:
+                  - link "No hazard" [ref=e169]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e171] [cursor=pointer]:
+                  - link "No hazard" [ref=e172]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e174] [cursor=pointer]:
+                  - link "No hazard" [ref=e175]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e177] [cursor=pointer]:
+                  - link "No hazard" [ref=e178]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=hoy&l=674701
+                - generic "No hazard" [ref=e180] [cursor=pointer]:
+                  - link "No hazard" [ref=e181]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e183] [cursor=pointer]:
+                  - link "No hazard" [ref=e184]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e186] [cursor=pointer]:
+                  - link "No hazard" [ref=e187]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e189] [cursor=pointer]:
+                  - link "No hazard" [ref=e190]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e192] [cursor=pointer]:
+                  - link "No hazard" [ref=e193]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e195] [cursor=pointer]:
+                  - link "No hazard" [ref=e196]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e198] [cursor=pointer]:
+                  - link "No hazard" [ref=e199]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e201] [cursor=pointer]:
+                  - link "No hazard" [ref=e202]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e204] [cursor=pointer]:
+                  - link "No hazard" [ref=e205]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e207] [cursor=pointer]:
+                  - link "No hazard" [ref=e208]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e210] [cursor=pointer]:
+                  - link "No hazard" [ref=e211]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e213] [cursor=pointer]:
+                  - link "No hazard" [ref=e214]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e216] [cursor=pointer]:
+                  - link "No hazard" [ref=e217]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e219] [cursor=pointer]:
+                  - link "No hazard" [ref=e220]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e222] [cursor=pointer]:
+                  - link "No hazard" [ref=e223]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e225] [cursor=pointer]:
+                  - link "No hazard" [ref=e226]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e228] [cursor=pointer]:
+                  - link "No hazard" [ref=e229]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e231] [cursor=pointer]:
+                  - link "No hazard" [ref=e232]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e234] [cursor=pointer]:
+                  - link "No hazard" [ref=e235]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e237] [cursor=pointer]:
+                  - link "No hazard" [ref=e238]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e240] [cursor=pointer]:
+                  - link "No hazard" [ref=e241]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e243] [cursor=pointer]:
+                  - link "No hazard" [ref=e244]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e246] [cursor=pointer]:
+                  - link "No hazard" [ref=e247]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e249] [cursor=pointer]:
+                  - link "No hazard" [ref=e250]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=mna&l=674701
+                - generic "No hazard" [ref=e252] [cursor=pointer]:
+                  - link "No hazard" [ref=e253]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=pmna&l=674701
+                - generic "No hazard" [ref=e255] [cursor=pointer]:
+                  - link "No hazard" [ref=e256]:
+                    - /url: https://www.aemet.es/en/eltiempo/prediccion/avisos?w=pmna&l=674701
+              - generic [ref=e257]:
+                - generic:
+                  - list [ref=e261]:
+                    - listitem [ref=e262]: "56"
+                  - list [ref=e264]:
+                    - listitem [ref=e265]: "49"
+                  - list [ref=e267]:
+                    - listitem [ref=e268]: "45"
+                  - list [ref=e270]:
+                    - listitem [ref=e271]: "41"
+                  - list [ref=e273]:
+                    - listitem [ref=e274]: "40"
+                  - list [ref=e276]:
+                    - listitem [ref=e277]: "38"
+                  - list [ref=e279]:
+                    - listitem [ref=e280]: "36"
+                  - list [ref=e282]:
+                    - listitem [ref=e283]: "38"
+                  - list [ref=e285]:
+                    - listitem [ref=e286]: "41"
+                  - list [ref=e288]:
+                    - listitem [ref=e289]: "44"
+                  - list [ref=e291]:
+                    - listitem [ref=e292]: "48"
+                  - list [ref=e294]:
+                    - listitem [ref=e295]: "52"
+                  - list [ref=e297]:
+                    - listitem [ref=e298]: "56"
+                  - list [ref=e300]:
+                    - listitem [ref=e301]: "59"
+                  - list [ref=e303]:
+                    - listitem [ref=e304]: "61"
+                  - list [ref=e306]:
+                    - listitem [ref=e307]: "64"
+                  - list [ref=e309]:
+                    - listitem [ref=e310]: "65"
+                  - list [ref=e312]:
+                    - listitem [ref=e313]: "68"
+                  - list [ref=e315]:
+                    - listitem [ref=e316]: "71"
+                  - list [ref=e318]:
+                    - listitem [ref=e319]: "72"
+                  - list [ref=e321]:
+                    - listitem [ref=e322]: "73"
+                  - list [ref=e324]:
+                    - listitem [ref=e325]: "70"
+                  - list [ref=e327]:
+                    - listitem [ref=e328]: "66"
+                  - list [ref=e330]:
+                    - listitem [ref=e331]: "64"
+                  - list [ref=e333]:
+                    - listitem [ref=e334]: "64"
+                  - list [ref=e336]:
+                    - listitem [ref=e337]: "57"
+                  - list [ref=e339]:
+                    - listitem [ref=e340]: "51"
+                  - list [ref=e342]:
+                    - listitem [ref=e343]: "46"
+                  - list [ref=e345]:
+                    - listitem [ref=e346]: "42"
+                  - list [ref=e348]:
+                    - listitem [ref=e349]: "38"
+                  - list [ref=e351]:
+                    - listitem [ref=e352]: "34"
+                  - list [ref=e354]:
+                    - listitem [ref=e355]: "35"
+                  - list [ref=e357]:
+                    - listitem [ref=e358]: "37"
+                  - list [ref=e360]:
+                    - listitem [ref=e361]: "40"
+                  - list [ref=e363]:
+                    - listitem [ref=e364]: "44"
+                  - list [ref=e366]:
+                    - listitem [ref=e367]: "48"
+                  - list [ref=e369]:
+                    - listitem [ref=e370]: "52"
+                  - list [ref=e372]:
+                    - listitem [ref=e373]: "56"
+                  - list [ref=e375]:
+                    - listitem [ref=e376]: "62"
+                - generic:
+                  - list [ref=e378]:
+                    - listitem [ref=e379]: "16"
+                  - list [ref=e381]:
+                    - listitem [ref=e382]: "18"
+                  - list [ref=e384]:
+                    - listitem [ref=e385]: "20"
+                  - list [ref=e387]:
+                    - listitem [ref=e388]: "22"
+                  - list [ref=e390]:
+                    - listitem [ref=e391]: "23"
+                  - list [ref=e393]:
+                    - listitem [ref=e394]: "24"
+                  - list [ref=e396]:
+                    - listitem [ref=e397]: "24"
+                  - list [ref=e399]:
+                    - listitem [ref=e400]: "23"
+                  - list [ref=e402]:
+                    - listitem [ref=e403]: "22"
+                  - list [ref=e405]:
+                    - listitem [ref=e406]: "20"
+                  - list [ref=e408]:
+                    - listitem [ref=e409]: "20"
+                  - list [ref=e411]:
+                    - listitem [ref=e412]: "19"
+                  - list [ref=e414]:
+                    - listitem [ref=e415]: "18"
+                  - list [ref=e417]:
+                    - listitem [ref=e418]: "17"
+                  - list [ref=e420]:
+                    - listitem [ref=e421]: "16"
+                  - list [ref=e423]:
+                    - listitem [ref=e424]: "15"
+                  - list [ref=e426]:
+                    - listitem [ref=e427]: "15"
+                  - list [ref=e429]:
+                    - listitem [ref=e430]: "14"
+                  - list [ref=e432]:
+                    - listitem [ref=e433]: "13"
+                  - list [ref=e435]:
+                    - listitem [ref=e436]: "13"
+                  - list [ref=e438]:
+                    - listitem [ref=e439]: "13"
+                  - list [ref=e441]:
+                    - listitem [ref=e442]: "13"
+                  - list [ref=e444]:
+                    - listitem [ref=e445]: "14"
+                  - list [ref=e447]:
+                    - listitem [ref=e448]: "15"
+                  - list [ref=e450]:
+                    - listitem [ref=e451]: "15"
+                  - list [ref=e453]:
+                    - listitem [ref=e454]: "18"
+                  - list [ref=e456]:
+                    - listitem [ref=e457]: "20"
+                  - list [ref=e459]:
+                    - listitem [ref=e460]: "22"
+                  - list [ref=e462]:
+                    - listitem [ref=e463]: "23"
+                  - list [ref=e465]:
+                    - listitem [ref=e466]: "24"
+                  - list [ref=e468]:
+                    - listitem [ref=e469]: "25"
+                  - list [ref=e471]:
+                    - listitem [ref=e472]: "24"
+                  - list [ref=e474]:
+                    - listitem [ref=e475]: "23"
+                  - list [ref=e477]:
+                    - listitem [ref=e478]: "21"
+                  - list [ref=e480]:
+                    - listitem [ref=e481]: "20"
+                  - list [ref=e483]:
+                    - listitem [ref=e484]: "19"
+                  - list [ref=e486]:
+                    - listitem [ref=e487]: "18"
+                  - list [ref=e489]:
+                    - listitem [ref=e490]: "17"
+                  - list [ref=e492]:
+                    - listitem [ref=e493]: "16"
+                - generic:
+                  - list [ref=e495]:
+                    - listitem [ref=e496]: "16"
+                  - list [ref=e498]:
+                    - listitem [ref=e499]: "18"
+                  - list [ref=e501]:
+                    - listitem [ref=e502]: "20"
+                  - list [ref=e504]:
+                    - listitem [ref=e505]: "22"
+                  - list [ref=e507]:
+                    - listitem [ref=e508]: "23"
+                  - list [ref=e510]:
+                    - listitem [ref=e511]: "24"
+                  - list [ref=e513]:
+                    - listitem [ref=e514]: "24"
+                  - list [ref=e516]:
+                    - listitem [ref=e517]: "23"
+                  - list [ref=e519]:
+                    - listitem [ref=e520]: "22"
+                  - list [ref=e522]:
+                    - listitem [ref=e523]: "20"
+                  - list [ref=e525]:
+                    - listitem [ref=e526]: "20"
+                  - list [ref=e528]:
+                    - listitem [ref=e529]: "19"
+                  - list [ref=e531]:
+                    - listitem [ref=e532]: "18"
+                  - list [ref=e534]:
+                    - listitem [ref=e535]: "17"
+                  - list [ref=e537]:
+                    - listitem [ref=e538]: "16"
+                  - list [ref=e540]:
+                    - listitem [ref=e541]: "15"
+                  - list [ref=e543]:
+                    - listitem [ref=e544]: "15"
+                  - list [ref=e546]:
+                    - listitem [ref=e547]: "14"
+                  - list [ref=e549]:
+                    - listitem [ref=e550]: "13"
+                  - list [ref=e552]:
+                    - listitem [ref=e553]: "13"
+                  - list [ref=e555]:
+                    - listitem [ref=e556]: "13"
+                  - list [ref=e558]:
+                    - listitem [ref=e559]: "13"
+                  - list [ref=e561]:
+                    - listitem [ref=e562]: "14"
+                  - list [ref=e564]:
+                    - listitem [ref=e565]: "15"
+                  - list [ref=e567]:
+                    - listitem [ref=e568]: "15"
+                  - list [ref=e570]:
+                    - listitem [ref=e571]: "18"
+                  - list [ref=e573]:
+                    - listitem [ref=e574]: "20"
+                  - list [ref=e576]:
+                    - listitem [ref=e577]: "22"
+                  - list [ref=e579]:
+                    - listitem [ref=e580]: "23"
+                  - list [ref=e582]:
+                    - listitem [ref=e583]: "24"
+                  - list [ref=e585]:
+                    - listitem [ref=e586]: "25"
+                  - list [ref=e588]:
+                    - listitem [ref=e589]: "24"
+                  - list [ref=e591]:
+                    - listitem [ref=e592]: "23"
+                  - list [ref=e594]:
+                    - listitem [ref=e595]: "21"
+                  - list [ref=e597]:
+                    - listitem [ref=e598]: "20"
+                  - list [ref=e600]:
+                    - listitem [ref=e601]: "19"
+                  - list [ref=e603]:
+                    - listitem [ref=e604]: "18"
+                  - list [ref=e606]:
+                    - listitem [ref=e607]: "17"
+                  - list [ref=e609]:
+                    - listitem [ref=e610]: "16"
+              - generic [ref=e612]:
+                - generic [ref=e613]:
+                  - generic [ref=e614]: Sun 11
+                  - generic [ref=e616]: "11"
+                  - img "Overcast" [ref=e618]
+                  - generic [ref=e619]:
+                    - generic [ref=e620]:
+                      - generic [ref=e621]: S
+                      - generic [ref=e622]: "6"
+                    - generic [ref=e626]: "10"
+                - generic [ref=e630]:
+                  - generic [ref=e632]: "12"
+                  - img "Partly cloudy" [ref=e634]
+                  - generic [ref=e635]:
+                    - generic [ref=e636]:
+                      - generic [ref=e637]: S
+                      - generic [ref=e638]: "5"
+                    - generic [ref=e642]: "9"
+                - generic [ref=e646]:
+                  - generic [ref=e648]: "13"
+                  - img "Cloudless sky" [ref=e650]
+                  - generic [ref=e651]:
+                    - generic [ref=e652]:
+                      - generic [ref=e653]: S
+                      - generic [ref=e654]: "4"
+                    - generic [ref=e658]: "11"
+                - generic [ref=e662]:
+                  - generic [ref=e664]: "14"
+                  - img "Partly cloudy" [ref=e666]
+                  - generic [ref=e667]:
+                    - generic [ref=e668]:
+                      - generic [ref=e669]: SO
+                      - generic [ref=e670]: "4"
+                    - generic [ref=e674]: "15"
+                - generic [ref=e678]:
+                  - generic [ref=e680]: "15"
+                  - img "High clouds" [ref=e682]
+                  - generic [ref=e683]:
+                    - generic [ref=e684]:
+                      - generic [ref=e685]: O
+                      - generic [ref=e686]: "5"
+                    - generic [ref=e690]: "18"
+                - generic [ref=e694]:
+                  - generic [ref=e696]: "16"
+                  - img "High clouds" [ref=e698]
+                  - generic [ref=e699]:
+                    - generic [ref=e700]:
+                      - generic [ref=e701]: O
+                      - generic [ref=e702]: "7"
+                    - generic [ref=e706]: "18"
+                - generic [ref=e710]:
+                  - generic [ref=e712]: "17"
+                  - img "Cloudless sky" [ref=e714]
+                  - generic [ref=e715]:
+                    - generic [ref=e716]:
+                      - generic [ref=e717]: O
+                      - generic [ref=e718]: "6"
+                    - generic [ref=e722]: "15"
+                - generic [ref=e726]:
+                  - generic [ref=e728]: "18"
+                  - img "Cloudless sky" [ref=e730]
+                  - generic [ref=e731]:
+                    - generic [ref=e732]:
+                      - generic [ref=e733]: O
+                      - generic [ref=e734]: "4"
+                    - generic [ref=e738]: "12"
+                - generic [ref=e742]:
+                  - generic [ref=e744]: "19"
+                  - img "Cloudless sky" [ref=e746]
+                  - generic [ref=e747]:
+                    - generic [ref=e748]:
+                      - generic [ref=e749]: O
+                      - generic [ref=e750]: "5"
+                    - generic [ref=e754]: "10"
+                - generic [ref=e758]:
+                  - generic [ref=e760]: "20"
+                  - img "Cloudless sky" [ref=e762]
+                  - generic [ref=e763]:
+                    - generic [ref=e764]:
+                      - generic [ref=e765]: "NO"
+                      - generic [ref=e766]: "2"
+                    - generic [ref=e770]: "3"
+                - generic [ref=e774]:
+                  - generic [ref=e776]: "21"
+                  - img "Cloudless sky" [ref=e778]
+                  - generic [ref=e779]:
+                    - generic [ref=e780]:
+                      - generic [ref=e781]: "N"
+                      - generic [ref=e782]: "1"
+                    - generic [ref=e786]: "4"
+                - generic [ref=e790]:
+                  - generic [ref=e792]: "22"
+                  - img "Cloudless sky" [ref=e794]
+                  - generic [ref=e795]:
+                    - generic [ref=e796]:
+                      - generic [ref=e797]: "N"
+                      - generic [ref=e798]: "3"
+                    - generic [ref=e802]: "4"
+                - generic [ref=e806]:
+                  - generic [ref=e808]: "23"
+                  - img "Partly cloudy" [ref=e810]
+                  - generic [ref=e811]:
+                    - generic [ref=e812]:
+                      - generic [ref=e813]: E
+                      - generic [ref=e814]: "1"
+                    - generic [ref=e818]: "5"
+                - generic [ref=e822]:
+                  - generic [ref=e823]: Mon 12
+                  - generic [ref=e825]: "00"
+                  - img "High clouds" [ref=e827]
+                  - generic [ref=e828]:
+                    - generic [ref=e829]:
+                      - generic [ref=e830]: O
+                      - generic [ref=e831]: "4"
+                    - generic [ref=e835]: "6"
+                - generic [ref=e839]:
+                  - generic [ref=e841]: "01"
+                  - img "High clouds" [ref=e843]
+                  - generic [ref=e844]:
+                    - generic [ref=e845]:
+                      - generic [ref=e846]: SO
+                      - generic [ref=e847]: "4"
+                    - generic [ref=e851]: "7"
+                - generic [ref=e855]:
+                  - generic [ref=e857]: "02"
+                  - img "High clouds" [ref=e859]
+                  - generic [ref=e860]:
+                    - generic [ref=e861]:
+                      - generic [ref=e862]: SO
+                      - generic [ref=e863]: "6"
+                    - generic [ref=e867]: "8"
+                - generic [ref=e871]:
+                  - generic [ref=e873]: "03"
+                  - img "High clouds" [ref=e875]
+                  - generic [ref=e876]:
+                    - generic [ref=e877]:
+                      - generic [ref=e878]: SO
+                      - generic [ref=e879]: "3"
+                    - generic [ref=e883]: "6"
+                - generic [ref=e887]:
+                  - generic [ref=e889]: "04"
+                  - img "Partly cloudy" [ref=e891]
+                  - generic [ref=e892]:
+                    - generic [ref=e893]:
+                      - generic [ref=e894]: SE
+                      - generic [ref=e895]: "3"
+                    - generic [ref=e899]: "8"
+                - generic [ref=e903]:
+                  - generic [ref=e905]: "05"
+                  - img "Partly cloudy" [ref=e907]
+                  - generic [ref=e908]:
+                    - generic [ref=e909]:
+                      - generic [ref=e910]: SO
+                      - generic [ref=e911]: "7"
+                    - generic [ref=e915]: "9"
+                - generic [ref=e919]:
+                  - generic [ref=e921]: "06"
+                  - img "Partly cloudy" [ref=e923]
+                  - generic [ref=e924]:
+                    - generic [ref=e925]:
+                      - generic [ref=e926]: S
+                      - generic [ref=e927]: "6"
+                    - generic [ref=e931]: "10"
+                - generic [ref=e935]:
+                  - generic [ref=e937]: "07"
+                  - img "Partly cloudy" [ref=e939]
+                  - generic [ref=e940]:
+                    - generic [ref=e941]:
+                      - generic [ref=e942]: S
+                      - generic [ref=e943]: "8"
+                    - generic [ref=e947]: "10"
+                - generic [ref=e951]:
+                  - generic [ref=e953]: "08"
+                  - img "Cloudless sky" [ref=e955]
+                  - generic [ref=e956]:
+                    - generic [ref=e957]:
+                      - generic [ref=e958]: S
+                      - generic [ref=e959]: "5"
+                    - generic [ref=e963]: "9"
+                - generic [ref=e967]:
+                  - generic [ref=e969]: "09"
+                  - img "Partly cloudy" [ref=e971]
+                  - generic [ref=e972]:
+                    - generic [ref=e973]:
+                      - generic [ref=e974]: S
+                      - generic [ref=e975]: "6"
+                    - generic [ref=e979]: "8"
+                - generic [ref=e983]:
+                  - generic [ref=e985]: "10"
+                  - img "Partly cloudy" [ref=e987]
+                  - generic [ref=e988]:
+                    - generic [ref=e989]:
+                      - generic [ref=e990]: S
+                      - generic [ref=e991]: "3"
+                    - generic [ref=e995]: "12"
+                - generic [ref=e999]:
+                  - generic [ref=e1001]: "11"
+                  - img "Partly cloudy" [ref=e1003]
+                  - generic [ref=e1004]:
+                    - generic [ref=e1005]:
+                      - generic [ref=e1006]: S
+                      - generic [ref=e1007]: "7"
+                    - generic [ref=e1011]: "13"
+                - generic [ref=e1015]:
+                  - generic [ref=e1017]: "12"
+                  - img "High clouds" [ref=e1019]
+                  - generic [ref=e1020]:
+                    - generic [ref=e1021]:
+                      - generic [ref=e1022]: S
+                      - generic [ref=e1023]: "6"
+                    - generic [ref=e1027]: "12"
+                - generic [ref=e1031]:
+                  - generic [ref=e1033]: "13"
+                  - img "High clouds" [ref=e1035]
+                  - generic [ref=e1036]:
+                    - generic [ref=e1037]:
+                      - generic [ref=e1038]: SO
+                      - generic [ref=e1039]: "4"
+                    - generic [ref=e1043]: "13"
+                - generic [ref=e1047]:
+                  - generic [ref=e1049]: "14"
+                  - img "High clouds" [ref=e1051]
+                  - generic [ref=e1052]:
+                    - generic [ref=e1053]:
+                      - generic [ref=e1054]: O
+                      - generic [ref=e1055]: "4"
+                    - generic [ref=e1059]: "15"
+                - generic [ref=e1063]:
+                  - generic [ref=e1065]: "15"
+                  - img "High clouds" [ref=e1067]
+                  - generic [ref=e1068]:
+                    - generic [ref=e1069]:
+                      - generic [ref=e1070]: O
+                      - generic [ref=e1071]: "5"
+                    - generic [ref=e1075]: "16"
+                - generic [ref=e1079]:
+                  - generic [ref=e1081]: "16"
+                  - img "Partly cloudy" [ref=e1083]
+                  - generic [ref=e1084]:
+                    - generic [ref=e1085]:
+                      - generic [ref=e1086]: O
+                      - generic [ref=e1087]: "5"
+                    - generic [ref=e1091]: "15"
+                - generic [ref=e1095]:
+                  - generic [ref=e1097]: "17"
+                  - img "Cloudless sky" [ref=e1099]
+                  - generic [ref=e1100]:
+                    - generic [ref=e1101]:
+                      - generic [ref=e1102]: O
+                      - generic [ref=e1103]: "4"
+                    - generic [ref=e1107]: "14"
+                - generic [ref=e1111]:
+                  - generic [ref=e1113]: "18"
+                  - img "Cloudless sky" [ref=e1115]
+                  - generic [ref=e1116]:
+                    - generic [ref=e1117]:
+                      - generic [ref=e1118]: "NO"
+                      - generic [ref=e1119]: "5"
+                    - generic [ref=e1123]: "13"
+                - generic [ref=e1127]:
+                  - generic [ref=e1129]: "19"
+                  - img "Cloudless sky" [ref=e1131]
+                  - generic [ref=e1132]:
+                    - generic [ref=e1133]:
+                      - generic [ref=e1134]: "NO"
+                      - generic [ref=e1135]: "5"
+                    - generic [ref=e1139]: "10"
+                - generic [ref=e1143]:
+                  - generic [ref=e1145]: "20"
+                  - img "Partly cloudy" [ref=e1147]
+                  - generic [ref=e1148]:
+                    - generic [ref=e1149]:
+                      - generic [ref=e1150]: "N"
+                      - generic [ref=e1151]: "5"
+                    - generic [ref=e1155]: "6"
+                - generic [ref=e1159]:
+                  - generic [ref=e1161]: "21"
+                  - img "Cloudless sky" [ref=e1163]
+                  - generic [ref=e1164]:
+                    - generic [ref=e1165]:
+                      - generic [ref=e1166]: "NO"
+                      - generic [ref=e1167]: "4"
+                    - generic [ref=e1171]: "6"
+                - generic [ref=e1175]:
+                  - generic [ref=e1177]: "22"
+                  - img "Cloudless sky" [ref=e1179]
+                  - generic [ref=e1180]:
+                    - generic [ref=e1181]:
+                      - generic [ref=e1182]: "NO"
+                      - generic [ref=e1183]: "5"
+                    - generic [ref=e1187]: "7"
+                - generic [ref=e1191]:
+                  - generic [ref=e1193]: "23"
+                  - img "Cloudless sky" [ref=e1195]
+                  - generic [ref=e1196]:
+                    - generic [ref=e1197]:
+                      - generic [ref=e1198]: "N"
+                      - generic [ref=e1199]: "5"
+                    - generic [ref=e1203]: "7"
+                - generic [ref=e1207]:
+                  - generic [ref=e1208]: Tue 13
+                  - generic [ref=e1210]: "00"
+                  - img "Cloudless sky" [ref=e1212]
+                  - generic [ref=e1213]:
+                    - generic [ref=e1214]:
+                      - generic [ref=e1215]: "N"
+                      - generic [ref=e1216]: "5"
+                    - generic [ref=e1220]: "20"
+                - generic [ref=e1224]:
+                  - generic [ref=e1226]: "01"
+                  - img "Cloudless sky" [ref=e1228]
+                  - generic [ref=e1229]:
+                    - generic [ref=e1230]:
+                      - generic [ref=e1231]: "N"
+                      - generic [ref=e1232]: "12"
+                    - generic [ref=e1236]: "17"
+            - img "Legend" [ref=e1242] [cursor=pointer]
+        - generic [ref=e1245]:
+          - generic [ref=e1246]:
+            - generic [ref=e1247]: "Select a province or autonomous city:"
+            - combobox "Select a province or autonomous city:" [ref=e1249] [cursor=pointer]:
+              - option "Select an option"
+              - option "A Coruña"
+              - option "Alacant/Alicante"
+              - option "Albacete"
+              - option "Almería"
+              - option "Araba/Álava"
+              - option "Asturias"
+              - option "Ávila"
+              - option "Badajoz"
+              - option "Barcelona"
+              - option "Bizkaia"
+              - option "Burgos"
+              - option "Cáceres"
+              - option "Cádiz"
+              - option "Cantabria"
+              - option "Castelló/Castellón"
+              - option "Ceuta"
+              - option "Ciudad Real"
+              - option "Córdoba"
+              - option "Cuenca"
+              - option "Gipuzkoa"
+              - option "Girona"
+              - option "Granada"
+              - option "Guadalajara"
+              - option "Huelva"
+              - option "Huesca"
+              - option "Illes Balears"
+              - option "Jaén"
+              - option "La Rioja"
+              - option "Las Palmas"
+              - option "León"
+              - option "Lleida"
+              - option "Lugo"
+              - option "Madrid"
+              - option "Málaga"
+              - option "Melilla"
+              - option "Murcia"
+              - option "Navarra"
+              - option "Ourense"
+              - option "Palencia"
+              - option "Pontevedra"
+              - option "Salamanca"
+              - option "Santa Cruz de Tenerife"
+              - option "Segovia"
+              - option "Sevilla"
+              - option "Soria"
+              - option "Tarragona"
+              - option "Teruel"
+              - option "Toledo"
+              - option "València/Valencia"
+              - option "Valladolid" [selected]
+              - option "Zamora"
+              - option "Zaragoza"
+          - generic [ref=e1250]:
+            - generic [ref=e1251]: "Select location:"
+            - combobox "Select location:" [ref=e1253] [cursor=pointer]:
+              - option "Select an option"
+              - option "Adalia"
+              - option "Aguasal"
+              - option "Aguilar de Campos"
+              - option "Alaejos"
+              - option "Alcazarén"
+              - option "Aldea de San Miguel"
+              - option "Aldeamayor de San Martín"
+              - option "Almenara de Adaja"
+              - option "Amusquillo"
+              - option "Arroyo de la Encomienda"
+              - option "Ataquines"
+              - option "Bahabón"
+              - option "Barcial de la Loma"
+              - option "Barruelo del Valle"
+              - option "Becilla de Valderaduey"
+              - option "Benafarces"
+              - option "Bercero"
+              - option "Berceruelo"
+              - option "Berrueces"
+              - option "Bobadilla del Campo"
+              - option "Bocigas"
+              - option "Bocos de Duero"
+              - option "Boecillo"
+              - option "Bolaños de Campos"
+              - option "Brahojos de Medina"
+              - option "Bustillo de Chaves"
+              - option "Cabezón de Pisuerga"
+              - option "Cabezón de Valderaduey"
+              - option "Cabreros del Monte"
+              - option "Campaspero"
+              - option "Campillo, El"
+              - option "Camporredondo"
+              - option "Canalejas de Peñafiel"
+              - option "Canillas de Esgueva"
+              - option "Carpio"
+              - option "Casasola de Arión"
+              - option "Castrejón de Trabancos"
+              - option "Castrillo de Duero"
+              - option "Castrillo-Tejeriego"
+              - option "Castrobol"
+              - option "Castrodeza"
+              - option "Castromembibre"
+              - option "Castromonte"
+              - option "Castronuevo de Esgueva"
+              - option "Castronuño"
+              - option "Castroponce"
+              - option "Castroverde de Cerrato"
+              - option "Ceinos de Campos"
+              - option "Cervillego de la Cruz"
+              - option "Cigales"
+              - option "Ciguñuela"
+              - option "Cistérniga"
+              - option "Cogeces de Íscar"
+              - option "Cogeces del Monte"
+              - option "Corcos"
+              - option "Corrales de Duero"
+              - option "Cubillas de Santa Marta"
+              - option "Cuenca de Campos"
+              - option "Curiel de Duero"
+              - option "Encinas de Esgueva"
+              - option "Esguevillas de Esgueva"
+              - option "Fombellida"
+              - option "Fompedraza"
+              - option "Fontihoyuelo"
+              - option "Fresno el Viejo"
+              - option "Fuensaldaña"
+              - option "Fuente el Sol"
+              - option "Fuente-Olmedo"
+              - option "Gallegos de Hornija"
+              - option "Gatón de Campos"
+              - option "Geria"
+              - option "Herrín de Campos"
+              - option "Hornillos de Eresma"
+              - option "Íscar"
+              - option "Laguna de Duero"
+              - option "Langayo"
+              - option "Llano de Olmedo"
+              - option "Lomoviejo"
+              - option "Manzanillo"
+              - option "Marzales"
+              - option "Matapozuelos"
+              - option "Matilla de los Caños"
+              - option "Mayorga"
+              - option "Medina del Campo"
+              - option "Medina de Rioseco"
+              - option "Megeces"
+              - option "Melgar de Abajo"
+              - option "Melgar de Arriba"
+              - option "Mojados"
+              - option "Monasterio de Vega"
+              - option "Montealegre de Campos"
+              - option "Montemayor de Pililla"
+              - option "Moral de la Reina"
+              - option "Moraleja de las Panaderas"
+              - option "Morales de Campos"
+              - option "Mota del Marqués"
+              - option "Mucientes"
+              - option "Mudarra, La"
+              - option "Muriel"
+              - option "Nava del Rey"
+              - option "Nueva Villa de las Torres"
+              - option "Olivares de Duero"
+              - option "Olmedo"
+              - option "Olmos de Esgueva"
+              - option "Olmos de Peñafiel"
+              - option "Palazuelo de Vedija"
+              - option "Parrilla, La"
+              - option "Pedraja de Portillo, La"
+              - option "Pedrajas de San Esteban"
+              - option "Pedrosa del Rey"
+              - option "Peñafiel"
+              - option "Peñaflor de Hornija"
+              - option "Pesquera de Duero"
+              - option "Piña de Esgueva"
+              - option "Piñel de Abajo"
+              - option "Piñel de Arriba"
+              - option "Pollos"
+              - option "Portillo"
+              - option "Pozal de Gallinas"
+              - option "Pozaldez"
+              - option "Pozuelo de la Orden"
+              - option "Puras"
+              - option "Quintanilla de Arriba"
+              - option "Quintanilla del Molar"
+              - option "Quintanilla de Onésimo"
+              - option "Quintanilla de Trigueros"
+              - option "Rábano"
+              - option "Ramiro"
+              - option "Renedo de Esgueva"
+              - option "Roales de Campos"
+              - option "Robladillo"
+              - option "Roturas"
+              - option "Rubí de Bracamonte"
+              - option "Rueda"
+              - option "Saelices de Mayorga"
+              - option "Salvador de Zapardiel"
+              - option "San Cebrián de Mazote"
+              - option "San Llorente"
+              - option "San Martín de Valvení"
+              - option "San Miguel del Arroyo"
+              - option "San Miguel del Pino"
+              - option "San Pablo de la Moraleja"
+              - option "San Pedro de Latarce"
+              - option "San Pelayo"
+              - option "San Román de Hornija"
+              - option "San Salvador"
+              - option "Santa Eufemia del Arroyo"
+              - option "Santervás de Campos"
+              - option "Santibáñez de Valcorba"
+              - option "Santovenia de Pisuerga"
+              - option "San Vicente del Palacio"
+              - option "Sardón de Duero"
+              - option "Seca, La"
+              - option "Serrada"
+              - option "Siete Iglesias de Trabancos"
+              - option "Simancas"
+              - option "Tamariz de Campos"
+              - option "Tiedra"
+              - option "Tordehumos"
+              - option "Tordesillas"
+              - option "Torrecilla de la Abadesa"
+              - option "Torrecilla de la Orden"
+              - option "Torrecilla de la Torre"
+              - option "Torre de Esgueva"
+              - option "Torre de Peñafiel"
+              - option "Torrelobatón"
+              - option "Torrescárcela"
+              - option "Traspinedo"
+              - option "Trigueros del Valle"
+              - option "Tudela de Duero"
+              - option "Unión de Campos, La"
+              - option "Urones de Castroponce"
+              - option "Urueña"
+              - option "Valbuena de Duero"
+              - option "Valdearcos de la Vega"
+              - option "Valdenebro de los Valles"
+              - option "Valdestillas"
+              - option "Valdunquillo"
+              - option "Valladolid" [selected]
+              - option "Valoria la Buena"
+              - option "Valverde de Campos"
+              - option "Vega de Ruiponce"
+              - option "Vega de Valdetronco"
+              - option "Velascálvaro"
+              - option "Velilla"
+              - option "Velliza"
+              - option "Ventosa de la Cuesta"
+              - option "Viana de Cega"
+              - option "Villabáñez"
+              - option "Villabaruz de Campos"
+              - option "Villabrágima"
+              - option "Villacarralón"
+              - option "Villacid de Campos"
+              - option "Villaco"
+              - option "Villafrades de Campos"
+              - option "Villafranca de Duero"
+              - option "Villafrechós"
+              - option "Villafuerte"
+              - option "Villagarcía de Campos"
+              - option "Villagómez la Nueva"
+              - option "Villalán de Campos"
+              - option "Villalar de los Comuneros"
+              - option "Villalba de la Loma"
+              - option "Villalba de los Alcores"
+              - option "Villalbarba"
+              - option "Villalón de Campos"
+              - option "Villamuriel de Campos"
+              - option "Villán de Tordesillas"
+              - option "Villanubla"
+              - option "Villanueva de Duero"
+              - option "Villanueva de la Condesa"
+              - option "Villanueva de los Caballeros"
+              - option "Villanueva de los Infantes"
+              - option "Villanueva de San Mancio"
+              - option "Villardefrades"
+              - option "Villarmentero de Esgueva"
+              - option "Villasexmir"
+              - option "Villavaquerín"
+              - option "Villavellid"
+              - option "Villaverde de Medina"
+              - option "Villavicencio de los Caballeros"
+              - option "Viloria"
+              - option "Wamba"
+              - option "Zaratán"
+              - option "Zarza, La"
+        - generic [ref=e1256]:
+          - generic [ref=e1257]: "Search a location by name:"
+          - generic [ref=e1258]:
+            - textbox "Search a location by name:" [ref=e1259]: Write the location name in search
+            - button "Search" [ref=e1261] [cursor=pointer]
+        - generic [ref=e1263]:
+          - generic [ref=e1264]: Access to observed data from nearby weather stations (Distances referred to the location capital)
+          - generic [ref=e1265]:
+            - generic [ref=e1266]: "Weather stations belonging to the location:"
+            - table "List of weather stations belonging to the location" [ref=e1267]:
+              - rowgroup [ref=e1268]:
+                - row [ref=e1269]:
+                  - cell [ref=e1270]:
+                    - text: •
+                    - link "Valladolid to 2,88 km - Altitude 734 m" [ref=e1271] [cursor=pointer]:
+                      - /url: /en/eltiempo/observacion/ultimosdatos?k=cle&l=2422
+                  - cell [ref=e1272]:
+                    - text: •
+                    - link "Valladolid - Vivero Forestal to 6,17 km - Altitude 688 m" [ref=e1273] [cursor=pointer]:
+                      - /url: /en/eltiempo/observacion/ultimosdatos?k=cle&l=2422X
+            - generic [ref=e1274]: "Weather stations next to the location:"
+            - table "Weather stations next to the location:" [ref=e1275]:
+              - rowgroup [ref=e1276]:
+                - row [ref=e1277]:
+                  - cell [ref=e1278]:
+                    - text: •
+                    - 'link "Sardón de Duero (Location: Sardón de Duero) to 26,79 km - Altitude 725 m" [ref=e1279] [cursor=pointer]':
+                      - /url: /en/eltiempo/observacion/ultimosdatos?k=cle&l=2172Y
+                - row [ref=e1280]:
+                  - cell [ref=e1281]:
+                    - text: •
+                    - 'link "Rueda (Location: Rueda) to 32,72 km - Altitude 724 m" [ref=e1282] [cursor=pointer]':
+                      - /url: /en/eltiempo/observacion/ultimosdatos?k=cle&l=2507Y
+                - row [ref=e1283]:
+                  - cell [ref=e1284]:
+                    - text: •
+                    - 'link "Medina de Rioseco (Location: Medina de Rioseco) to 36,17 km - Altitude 731 m" [ref=e1285] [cursor=pointer]':
+                      - /url: /en/eltiempo/observacion/ultimosdatos?k=cle&l=2604B
+                - row [ref=e1286]:
+                  - cell [ref=e1287]:
+                    - text: •
+                    - 'link "Autilla del Pino (Location: Autilla del Pino) to 39,45 km - Altitude 874 m" [ref=e1288] [cursor=pointer]':
+                      - /url: /en/eltiempo/observacion/ultimosdatos?k=cle&l=2400E
+        - generic [ref=e1289]:
+          - heading "Related links:" [level=3] [ref=e1290]
+          - list [ref=e1291]:
+            - listitem [ref=e1292]:
+              - link "General forecast" [ref=e1293] [cursor=pointer]:
+                - /url: "https://www.aemet.es/en/eltiempo/prediccion/espana "
+        - generic [ref=e1294]: Weather forecasts for 8124 locations in Spain. They must be considered as the more probable tendency of the meteorological evolution for the next 7 days.The "Hourly weather forecast" shows the hour by hour-information up to 48 hours after the moment numerical models are updated (00,06,12,and 18 UTC), while the "7-Day weather forecast" reaches the whole period.The local time for which all instantaneous variables are predicted is the one shown in the timeline. Variables accumulated in one hour (maximum gust, precipitation and snow) are related to the next hour (for example, the precipitation at 09:00 corresponds to the accumulated precipitation between 09:00 and 10:00).Six-hourly intervals or greater correspond to UTC times. Therefore, one hour in winter time and two in summer time have to be added for local time.They are automatically generated by statistical treatment of data coming from weather numerical models, which may result in some differences from other weather forecasts elaborated by AEMET staff, who interprets and adjusts the model results.The selection made by locations gives rise to an information concerning weather forecasts for the capital or main city, due to some municipalities or locations may have a wide geographical area and significant differences in altitude, therefore some weather forecast data can vary from a place to another.
+        - generic [ref=e1296]:
+          - link [ref=e1298] [cursor=pointer]:
+            - /url: mailto:?subject=&body=:%20http%3A%2F%2Fwww.aemet.es
+            - img "Email" [ref=e1299]
+          - link [ref=e1301] [cursor=pointer]:
+            - /url: https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Fwww.aemet.es&t=
+            - img "Share on Facebook" [ref=e1302]
+          - link [ref=e1304] [cursor=pointer]:
+            - /url: "https://twitter.com/intent/tweet?source=http%3A%2F%2Fwww.aemet.es&text=Weather: Valladolid (Valladolid) - Hourly weather forecast - Chart - State Meteorological Agency - AEMET - Spanish Government&url=https%3A%2F%2Fwww.aemet.es%2Fen%2Feltiempo%2Fprediccion%2Fmunicipios%2Fhoras%2Fvalladolid-id47186&via=AEMET_Esp"
+            - img "Share on Twitter" [ref=e1305]
+          - img "Print version (it will open in a new window)" [ref=e1307] [cursor=pointer]
+  - generic [ref=e1308]:
+    - generic [ref=e1309]: © AEMET. The use and reproduction of this information is authorized only if AEMET is identified as its author
+    - list [ref=e1311]:
+      - listitem [ref=e1312]:
+        - link "Site map" [ref=e1313] [cursor=pointer]:
+          - /url: /en/mapaweb
+      - listitem [ref=e1314]: "|"
+      - listitem [ref=e1315]:
+        - link "Legal notice" [ref=e1316] [cursor=pointer]:
+          - /url: /en/nota_legal
+      - listitem [ref=e1317]: "|"
+      - listitem [ref=e1318]:
+        - link "Web accessibility" [ref=e1319] [cursor=pointer]:
+          - /url: /en/accesibilidad
+      - listitem [ref=e1320]: "|"
+      - listitem [ref=e1321]:
+        - link "Links" [ref=e1322] [cursor=pointer]:
+          - /url: /en/enlaces
+      - listitem [ref=e1323]: "|"
+      - listitem [ref=e1324]:
+        - link "Web help" [ref=e1325] [cursor=pointer]:
+          - /url: /en/ayuda
+    - generic [ref=e1326]:
+      - generic [ref=e1327]:
+        - paragraph [ref=e1328]: Widget
+        - generic [ref=e1329]:
+          - img "ico-widget" [ref=e1330]
+          - link "El tiempo en tu web" [ref=e1331] [cursor=pointer]:
+            - /url: /en/eltiempo/widgets
+      - generic [ref=e1332]:
+        - paragraph [ref=e1333]: Descarga nuestra App
+        - generic [ref=e1334]:
+          - img "Official aplication 'El Tiempo de AEMET' (Android & iOS)" [ref=e1335]
+          - link "App Oficial Android e iOS" [ref=e1336] [cursor=pointer]:
+            - /url: /en/app/eltiempodeAEMET
+      - generic [ref=e1337]:
+        - paragraph [ref=e1338]: Follow us
+        - link [ref=e1340] [cursor=pointer]:
+          - /url: /en/redes_sociales/facebook/AEMET_facebook
+          - img "Facebook" [ref=e1341]
+        - link [ref=e1343] [cursor=pointer]:
+          - /url: /en/redes_sociales/X/AEMET_X
+          - img "X" [ref=e1344]
+        - link [ref=e1346] [cursor=pointer]:
+          - /url: /en/redes_sociales/instagram/AEMET_Instagram
+          - img "Instagram" [ref=e1347]
+        - link [ref=e1349] [cursor=pointer]:
+          - /url: /en/redes_sociales/threads/AEMET_Threads
+          - img "Threads" [ref=e1350]
+        - link [ref=e1352] [cursor=pointer]:
+          - /url: /en/redes_sociales/bluesky/AEMET_Bluesky
+          - img "Bluesky" [ref=e1353]
+        - link [ref=e1355] [cursor=pointer]:
+          - /url: /en/redes_sociales/linkedin/AEMET_LinkedIn
+          - img "LinkedIn" [ref=e1356]
+        - link [ref=e1358] [cursor=pointer]:
+          - /url: /en/redes_sociales/youtube/AEMET_YouTube
+          - img "YouTube" [ref=e1359]
+        - link [ref=e1361] [cursor=pointer]:
+          - /url: https://aemetblog.wordpress.com
+          - img "Blog" [ref=e1362]
+        - link [ref=e1364] [cursor=pointer]:
+          - /url: /en/rss_info
+          - img "RSS" [ref=e1365]
+    - list [ref=e1367]:
+      - listitem [ref=e1368]:
+        - link [ref=e1369] [cursor=pointer]:
+          - /url: http://validator.w3.org/check?uri=referer
+          - img "Validates XHTML 1.0 Transitional. (it will open in a new window)" [ref=e1370]
+      - listitem [ref=e1371]:
+        - link [ref=e1372] [cursor=pointer]:
+          - /url: http://jigsaw.w3.org/css-validator/check/referer?profile=css3&usermedium=all&warning=no
+          - img "Certified W3C Valid CSS. (it will open in a new window)" [ref=e1373]
+      - listitem [ref=e1374]:
+        - link [ref=e1375] [cursor=pointer]:
+          - /url: http://www.w3.org/WAI/WCAG1AA-Conformance
+          - img "W3C-WAI WCAG 1.0 (Level AA) conformance icon. (it will open in a new window)" [ref=e1376]

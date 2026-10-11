@@ -23,6 +23,7 @@
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-vmore" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></symbol>
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3z"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
@@ -41,10 +42,12 @@
   <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="9" r="2.2"/><path d="M6 7.2v9.6M18 11.2c0 3-3 4-6 4.4-2.5.3-5 1-6 3"/></symbol>
   <symbol id="i-thumbup" viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V10H19a2 2 0 012 2l-1.5 6a2 2 0 01-2 1.5H7"/></symbol>
   <symbol id="i-thumbdown" viewBox="0 0 24 24"><path d="M17 13V4h3v9zM17 13l-4 7c-1.5 0-2.5-1-2.5-2.5V14H5a2 2 0 01-2-2l1.5-6A2 2 0 016.5 4.5H17"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></symbol>
   <symbol id="i-attach" viewBox="0 0 24 24"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5"/></symbol>
 </svg>
 
 <aside id="sidebar">
+  <div class="side-resize" id="sideResize" title="Drag to resize"></div>
   <div class="sb-top">
     <button class="ib" id="collapseBtn" title="Hide sidebar"><svg><use href="#i-panel"/></svg></button>
     <div class="brand" id="brand">Claude</div>
@@ -103,6 +106,7 @@
       <span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span>
       <button class="ib" id="sPin" title="Pin"><svg><use href="#i-pin"/></svg></button>
       <button class="ib" id="sMore" title="More"><svg><use href="#i-more"/></svg></button>
+      <button class="ib" id="browserBtn" title="Browser view (what Claude sees)"><svg><use href="#i-globe"/></svg></button>
       <button class="ib" id="panelBtn" title="Progress panel"><svg><use href="#i-panel" style="transform:scale(-1,1);transform-origin:center"/></svg></button>
     </header>
     <div class="s-body">
@@ -120,6 +124,8 @@
           </div></div></div>
       </div>
       <aside class="panel-side" id="panel">
+        <div class="sec" id="browserSec" hidden><div class="sec-t">Browser <span class="sub" id="browserTitle"></span><span class="spacer"></span><button class="ib sm" id="browserClose" title="Hide">✕</button></div>
+          <div class="bview" id="browserView"><img id="browserImg" alt=""><div class="bnote" id="browserNote">Opening the browser…</div></div></div>
         <div class="sec"><div class="sec-t">Progress <span class="sub" id="progressLabel"></span></div><div id="progressBody"></div></div>
         <div class="sec"><div class="sec-t">Outputs <span class="sub" id="outCount"></span></div><div id="outputs"></div></div>
         <div class="sec"><div class="sec-t">Steps <span class="sub" id="stepCount"></span></div><div class="acts" id="acts"></div></div>
@@ -261,7 +267,7 @@
     <div class="search-top"><svg class="sicon"><use href="#i-search"/></svg><input id="searchInput" placeholder="Search" autocomplete="off"><button class="ib" id="searchClose" title="Close">✕</button></div>
     <div class="pills small" id="searchFilters"><button data-f="all" class="active">All</button><button data-f="chat">Chat</button><button data-f="cowork">Cowork</button><button data-f="code">Code</button><button data-f="projects">Projects</button><button data-f="routines">Routines</button></div>
     <div id="searchResults"></div>
-    <div class="search-foot"><span><kbd>Esc</kbd> Close</span><span><kbd>←</kbd><kbd>→</kbd> Change type</span><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>↵</kbd> Open</span><span class="spacer"></span><span><kbd>/</kbd> or <kbd>⌘K</kbd> anywhere</span></div>
+    <div class="search-foot"><span><kbd>Esc</kbd> Close</span><span><kbd>←</kbd><kbd>→</kbd> Change type</span><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>↵</kbd> Open</span><span class="spacer"></span><span><kbd>⌘N</kbd> New</span><span><kbd>⌘⇧⌫</kbd> Delete chat</span><span><kbd>/</kbd> or <kbd>⌘K</kbd> anywhere</span></div>
   </div>
 </div>
 
@@ -320,18 +326,24 @@
 </dialog>
 
 <!-- Request a fix -->
-<dialog id="reportDlg">
-  <div class="dlg-head">Request a fix</div>
-  <form class="dlg-body form" id="reportForm">
-    <div class="pills" id="reportKind"><button type="button" data-k="bug" class="active">Something's broken</button><button type="button" data-k="feature">Something's missing</button></div>
-    <p class="muted small" id="reportIntro">Tell us what you saw. The app version, system and recent errors come with it automatically.</p>
+<dialog id="reportDlg" class="report">
+  <div class="rp-head">
+    <div class="rp-icon"><svg><use href="#i-life"/></svg></div>
+    <div class="rp-heading"><div class="rp-title">Request a fix</div><p id="reportIntro">Tell us what you saw. The app version, system and recent errors come with it automatically.</p></div>
+    <button type="button" class="ib" id="rpClose" title="Close">✕</button>
+  </div>
+  <form class="rp-body" id="reportForm">
+   <div class="rp-fields form">
+    <div class="pills wide" id="reportKind"><button type="button" data-k="bug" class="active">Something's broken</button><button type="button" data-k="feature">Something's missing</button></div>
     <label>Title <input id="rpTitle" required maxlength="200" placeholder="The reply stops after the first line"></label>
     <label id="rpPrimaryLbl">What happened <textarea id="rpPrimary" rows="4" placeholder="The message you saw, the button that did nothing…"></textarea></label>
     <label id="rpSecondaryLbl">What should have happened <textarea id="rpSecondary" rows="3" placeholder="The result you were expecting instead."></textarea></label>
-    <label id="rpImpactLbl">Impact <select id="rpImpact"><option value="blocking">Can't work</option><option value="slowing" selected>Slowing me down</option><option value="cosmetic">Cosmetic</option></select></label>
-    <label class="chk"><input type="checkbox" id="rpErrors" checked> Include the recent error messages of this session</label>
-    <div class="actions"><button type="button" class="btn" id="rpCancel">Cancel</button><button type="submit" class="btn dark" id="rpSend">Send report</button></div>
-    <p class="small" id="rpResult"></p>
+    <div id="rpImpactLbl" class="rp-impact"><span class="lbl">Impact</span>
+      <div class="pills" id="rpImpact"><button type="button" data-v="blocking">Can't work</button><button type="button" data-v="slowing" class="active">Slowing me down</button><button type="button" data-v="cosmetic">Cosmetic</button></div>
+    </div>
+    <label class="rp-errs" id="rpErrorsLbl"><input type="checkbox" id="rpErrors" checked><span class="txt"><b>Attach the recent error messages</b><small id="rpErrCount">From this session, so we can see what went wrong.</small></span></label>
+   </div>
+    <div class="rp-foot"><p class="small" id="rpResult"></p><span class="spacer"></span><button type="button" class="btn" id="rpCancel">Cancel</button><button type="submit" class="btn dark" id="rpSend">Send report</button></div>
   </form>
 </dialog>
 

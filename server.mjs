@@ -19,7 +19,8 @@ import crypto from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import https from 'node:https';
 import { fileURLToPath } from 'node:url';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket as WsClient } from 'ws';
+import { spawn } from 'node:child_process';
 import {
   query, listSessions, getSessionMessages, renameSession, deleteSession, forkSession,
 } from '@anthropic-ai/claude-agent-sdk';
@@ -36,12 +37,15 @@ const DATA_DIR = path.join(os.homedir(), '.claude-web-ui');
 const CHAT_DIR = path.join(DATA_DIR, 'chats');       // cwd of "Chat" sessions (no project)
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const PROBE_DIR = path.join(DATA_DIR, 'probe');      // cwd of the tiny connection-test requests (hidden from the sidebar)
+const SHOTS_DIR = path.join(DATA_DIR, 'shots');      // images returned by tools (browser screenshots…)
+const BROWSER_PROFILE = path.join(DATA_DIR, 'browser-profile');
+const CDP_PORT = Number(process.env.CDP_PORT || 9333);
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const MAX_UPLOAD = 25 * 1024 * 1024;
 const URL_WITH_TOKEN = `http://${HOST}:${PORT}/?t=${TOKEN}`;
 const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
-for (const d of [DATA_DIR, CHAT_DIR, UPLOAD_DIR, PROBE_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [DATA_DIR, CHAT_DIR, UPLOAD_DIR, PROBE_DIR, SHOTS_DIR]) fs.mkdirSync(d, { recursive: true });
 
 const KINDS = ['chat', 'cowork', 'code', 'routine'];
 const MODES = ['default', 'acceptEdits', 'auto', 'plan', 'bypassPermissions'];
@@ -58,13 +62,75 @@ const PROMPTS = {
   browser: 'When the user asks you to visit websites or act in a web page, use the browser tools (their names start with mcp__browser__).',
 };
 
-// Playwright's MCP server lets Claude drive Edge/Chrome (navigate, click, type, read pages).
+// Playwright's MCP server lets Claude drive a browser (navigate, click, type, read pages).
+// When we could launch Chrome/Edge ourselves with a debugging port, Playwright attaches to it
+// and the app can stream that window into the "Browser" panel.
 function browserServer() {
-  const args = ['-y', '@playwright/mcp@latest', '--browser', IS_WIN ? 'msedge' : 'chrome'];
+  const args = ['-y', '@playwright/mcp@latest', '--output-dir', SHOTS_DIR];
+  if (liveBrowser.ready) args.push('--cdp-endpoint', `http://127.0.0.1:${CDP_PORT}`);
+  else args.push('--browser', IS_WIN ? 'msedge' : 'chrome');
   return IS_WIN
     ? { type: 'stdio', command: 'cmd', args: ['/c', 'npx', ...args] }
     : { type: 'stdio', command: 'npx', args };
 }
+
+// ---- live browser (Chrome/Edge with a CDP port) ----
+const liveBrowser = { ready: false, proc: null, watchers: 0, cdp: null, target: null, lastFrame: null };
+function findBrowserExe() {
+  const c = [process.env.CLAUDE_WEB_UI_BROWSER].filter(Boolean);
+  if (IS_WIN) {
+    for (const base of [process.env['PROGRAMFILES(X86)'], process.env.PROGRAMFILES, process.env.LOCALAPPDATA].filter(Boolean)) {
+      c.push(path.join(base, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe'));
+    }
+  } else if (IS_MAC) c.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', '/Applications/Chromium.app/Contents/MacOS/Chromium');
+  else c.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/microsoft-edge');
+  return c.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
+}
+function httpJson(url, timeout = 1500) {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(null); } }); });
+    req.on('error', () => resolve(null)); req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+async function ensureLiveBrowser() {
+  if (await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)) { liveBrowser.ready = true; return true; }
+  const exe = findBrowserExe();
+  if (!exe) { liveBrowser.ready = false; return false; }
+  try {
+    const proc = spawn(exe, [`--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${BROWSER_PROFILE}`, '--no-first-run', '--no-default-browser-check', '--window-size=1280,900', '--disable-features=TranslateUI', 'about:blank'], { detached: !IS_WIN, stdio: 'ignore', windowsHide: false });
+    proc.unref(); liveBrowser.proc = proc;
+  } catch { liveBrowser.ready = false; return false; }
+  for (let i = 0; i < 40; i++) { await new Promise((r) => setTimeout(r, 250)); if (await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)) { liveBrowser.ready = true; return true; } }
+  liveBrowser.ready = false; return false;
+}
+// Streams the active page of the live browser as JPEG frames to every client that asked for it.
+let screencastTimer = null;
+async function screencastTick() {
+  if (!liveBrowser.watchers) { stopScreencast(); return; }
+  const list = await httpJson(`http://127.0.0.1:${CDP_PORT}/json/list`);
+  const page = (list || []).find((t) => t.type === 'page' && !/^(devtools|chrome):/.test(t.url || ''));
+  if (!page) { if (liveBrowser.cdp) { liveBrowser.cdp.close(); liveBrowser.cdp = null; liveBrowser.target = null; } broadcast({ type: 'browserState', live: liveBrowser.ready, page: null }); return; }
+  if (liveBrowser.target === page.id && liveBrowser.cdp?.readyState === 1) { broadcast({ type: 'browserState', live: true, page: { url: page.url, title: page.title } }); return; }
+  if (liveBrowser.cdp) liveBrowser.cdp.close();
+  liveBrowser.target = page.id;
+  const ws = new WsClient(page.webSocketDebuggerUrl, { perMessageDeflate: false });
+  liveBrowser.cdp = ws;
+  let id = 0; const call = (method, params = {}) => ws.send(JSON.stringify({ id: ++id, method, params }));
+  ws.on('open', () => { call('Page.enable'); call('Page.startScreencast', { format: 'jpeg', quality: 55, maxWidth: 1100, maxHeight: 900, everyNthFrame: 1 }); });
+  ws.on('message', (raw) => {
+    let m; try { m = JSON.parse(raw); } catch { return; }
+    if (m.method === 'Page.screencastFrame') {
+      call('Page.screencastFrameAck', { sessionId: m.params.sessionId });
+      liveBrowser.lastFrame = m.params.data;
+      broadcast({ type: 'browserFrame', data: m.params.data, url: page.url, title: page.title, w: m.params.metadata?.deviceWidth, h: m.params.metadata?.deviceHeight });
+    }
+  });
+  ws.on('close', () => { if (liveBrowser.cdp === ws) { liveBrowser.cdp = null; liveBrowser.target = null; } });
+  ws.on('error', () => {});
+  broadcast({ type: 'browserState', live: true, page: { url: page.url, title: page.title } });
+}
+function startScreencast() { if (!screencastTimer) { screencastTimer = setInterval(screencastTick, 1500); screencastTick(); } }
+function stopScreencast() { clearInterval(screencastTimer); screencastTimer = null; if (liveBrowser.cdp) { liveBrowser.cdp.close(); liveBrowser.cdp = null; liveBrowser.target = null; } }
 
 // ------------------------------------------------------- persistent state
 const state = loadState();
@@ -159,7 +225,7 @@ function createRuntime({ kind, cwd, sdkId = null, title = '', items = [], mode, 
 function emit(rt, ev) {
   // keep the transcript in memory so a client that opens the session later sees everything
   switch (ev.type) {
-    case 'user': rt.items.push({ type: 'user', text: ev.text, files: ev.files, prev: ev.prev ?? null }); break;
+    case 'user': rt.items.push({ type: 'user', text: ev.text, files: ev.files, paths: ev.paths, prev: ev.prev ?? null }); break;
     case 'thinkingStart': rt.liveThinking = ''; break;
     case 'thinkingDelta': rt.liveThinking += ev.text; break;
     case 'thinking': rt.liveThinking = ''; rt.items.push({ type: 'thinking', text: ev.text }); break;
@@ -167,7 +233,7 @@ function emit(rt, ev) {
     case 'assistantText': rt.liveText = ''; rt.items.push({ type: 'assistant', text: ev.text }); break;
     case 'toolUse': if (!ev.parent) rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false, parent: ev.parent || null }); break;
     case 'subText': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.parent); if (t) t.subText = (t.subText ? t.subText + '\n' : '') + ev.text; break; }
-    case 'toolResult': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.id); if (t) { t.result = ev.content; t.isError = ev.isError; } break; }
+    case 'toolResult': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.id); if (t) { t.result = ev.content; t.isError = ev.isError; if (ev.images?.length) t.images = ev.images; } break; }
     case 'permission': rt.items.push({ type: 'perm', id: ev.id, tool: ev.tool, input: ev.input, answer: null }); break;
     case 'permitted': { const p = rt.items.find((i) => i.type === 'perm' && i.id === ev.id); if (p) p.answer = ev.answer; break; }
     case 'note': if (ev.err && sameError(rt, ev.text)) return; rt.items.push({ type: 'note', text: ev.text, err: !!ev.err }); break;
@@ -252,6 +318,7 @@ async function runTurn(rt, text) {
   rt.abort = ac;
   setStatus(rt, 'running');
   try {
+    if (rt.browser && rt.kind !== 'chat' && !liveBrowser.ready) await ensureLiveBrowser();
     const q = query({ prompt: text, options: queryOptions(rt, ac) });
     for await (const m of q) handleSdkMessage(rt, m);
   } catch (err) {
@@ -295,7 +362,7 @@ function handleSdkMessage(rt, m) {
         else if (b.type === 'text' && b.text?.trim()) emit(rt, { type: 'subText', parent, text: b.text.slice(0, 1500) });
       }
     } else if (m.type === 'user' && Array.isArray(m.message?.content)) {
-      for (const b of m.message.content) if (b.type === 'tool_result') emit(rt, { type: 'toolResult', id: b.tool_use_id, isError: !!b.is_error, content: resultText(b.content), parent });
+      for (const b of m.message.content) if (b.type === 'tool_result') emit(rt, { type: 'toolResult', id: b.tool_use_id, isError: !!b.is_error, content: resultText(b.content), images: resultImages(b.content, b.tool_use_id), parent });
     }
     return;
   }
@@ -322,7 +389,7 @@ function handleSdkMessage(rt, m) {
     const content = Array.isArray(m.message?.content) ? m.message.content : [];
     for (const b of content) {
       if (b.type !== 'tool_result') continue;
-      emit(rt, { type: 'toolResult', id: b.tool_use_id, isError: !!b.is_error, content: resultText(b.content) });
+      emit(rt, { type: 'toolResult', id: b.tool_use_id, isError: !!b.is_error, content: resultText(b.content), images: resultImages(b.content, b.tool_use_id) });
     }
     return;
   }
@@ -396,7 +463,7 @@ function simplifyHistory(msgs) {
       if (!Array.isArray(c)) continue;
       for (const b of c) {
         if (b.type === 'tool_use') { const t = { type: 'tool', id: b.id, name: b.name, input: b.input, result: null, isError: false, parent: m.parent_tool_use_id }; tools.set(b.id, t); out.push(t); }
-        else if (b.type === 'tool_result') { const t = tools.get(b.tool_use_id); if (t) { t.result = resultText(b.content); t.isError = !!b.is_error; } }
+        else if (b.type === 'tool_result') { const t = tools.get(b.tool_use_id); if (t) { t.result = resultText(b.content); t.isError = !!b.is_error; const im = resultImages(b.content, b.tool_use_id); if (im.length) t.images = im; } }
       }
       continue;
     }
@@ -404,7 +471,7 @@ function simplifyHistory(msgs) {
       if (typeof c === 'string') { if (c.trim() && !isMetaPrompt(c)) out.push({ type: 'user', text: c, prev: lastUuid }); continue; }
       if (!Array.isArray(c)) continue;
       for (const b of c) {
-        if (b.type === 'tool_result') { const t = tools.get(b.tool_use_id); if (t) { t.result = resultText(b.content); t.isError = !!b.is_error; } }
+        if (b.type === 'tool_result') { const t = tools.get(b.tool_use_id); if (t) { t.result = resultText(b.content); t.isError = !!b.is_error; const im = resultImages(b.content, b.tool_use_id); if (im.length) t.images = im; } }
       }
       const text = c.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
       if (text.trim() && !isMetaPrompt(text)) out.push({ type: 'user', text, prev: lastUuid });
@@ -423,8 +490,20 @@ function isMetaPrompt(s) { return /^<(local-command|command-name|system-reminder
 
 function resultText(content) {
   const s = typeof content === 'string' ? content
-    : Array.isArray(content) ? content.map((c) => (c.type === 'text' ? c.text : `[${c.type}]`)).join('\n') : '';
+    : Array.isArray(content) ? content.map((c) => (c.type === 'text' ? c.text : c.type === 'image' ? '' : `[${c.type}]`)).filter(Boolean).join('\n') : '';
   return s.length > 4000 ? s.slice(0, 4000) + '\n… (truncated)' : s;
+}
+// Images returned by tools (browser screenshots, image reads) are saved so the page can show them.
+function resultImages(content, id) {
+  if (!Array.isArray(content)) return [];
+  const out = [];
+  content.forEach((c, i) => {
+    if (c.type !== 'image' || c.source?.type !== 'base64' || !c.source.data) return;
+    const ext = (c.source.media_type || 'image/png').split('/')[1].replace('jpeg', 'jpg');
+    const file = path.join(SHOTS_DIR, `${String(id || 'img').replace(/[^\w-]/g, '')}-${i}.${ext}`);
+    try { if (!fs.existsSync(file)) fs.writeFileSync(file, Buffer.from(c.source.data, 'base64')); out.push(file); } catch { /* ignore */ }
+  });
+  return out;
 }
 
 // ---- session listing (disk + memory) for the sidebar
@@ -802,7 +881,7 @@ wss.on('connection', async (ws) => {
             send({ type: 'opened', info: sessionInfo(rt), items: rt.items, liveText: '' });
             invalidateListing();
           }
-          emit(rt, { type: 'user', text, files: files.map((f) => path.basename(f)), prev: rt.lastUuid });
+          emit(rt, { type: 'user', text, files: files.map((f) => path.basename(f)), paths: files, prev: rt.lastUuid });
           if (!rt.title) broadcast({ type: 'info', info: sessionInfo(rt) });
           if (files.length) text += `\n\nAttached files (read them with your tools):\n${files.map((f) => `- ${f}`).join('\n')}`;
           runTurn(rt, text);
@@ -990,6 +1069,13 @@ wss.on('connection', async (ws) => {
           saveState(); broadcast({ type: 'settings', settings: publicSettings(), user: displayName(), repo: s.repo || REPO });
           break;
         }
+        case 'browserWatch': {
+          const was = ws.watching; ws.watching = !!msg.on;
+          liveBrowser.watchers += (ws.watching ? 1 : 0) - (was ? 1 : 0);
+          if (ws.watching) { if (!liveBrowser.ready) await ensureLiveBrowser(); send({ type: 'browserState', live: liveBrowser.ready, page: null, frame: liveBrowser.lastFrame }); if (liveBrowser.ready) startScreencast(); }
+          else if (liveBrowser.watchers <= 0) { liveBrowser.watchers = 0; stopScreencast(); }
+          break;
+        }
         case 'authCheck': send({ type: 'auth', auth: await checkAuth() }); break;
         case 'authLogin': openLoginTerminal(); break;
         case 'authTest': {
@@ -1018,7 +1104,7 @@ wss.on('connection', async (ws) => {
     }
   });
 
-  ws.on('close', () => clients.delete(ws));
+  ws.on('close', () => { clients.delete(ws); if (ws.watching) { liveBrowser.watchers = Math.max(0, liveBrowser.watchers - 1); if (!liveBrowser.watchers) stopScreencast(); } });
 });
 
 // -------------------------------------------------------------- helpers
