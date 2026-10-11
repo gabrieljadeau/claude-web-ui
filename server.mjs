@@ -749,6 +749,7 @@ async function sidebar() {
 // Artifacts: every file Claude wrote (Write / Edit / NotebookEdit) in any session, for the ⌘K palette. One pass per
 // transcript, cached by its last-modified time; live sessions are read from their items. Missing files are dropped.
 const artifactCache = new Map();   // sdkId -> { when, files: [{ path, action }] }
+const artifactPaths = new Set();   // every path the last index pass listed: "Show in folder" may reveal these too
 const ARTIFACT_TOOLS = { Write: 'Created', Edit: 'Edited', MultiEdit: 'Edited', NotebookEdit: 'Edited' };
 function artifactsOfTools(tools) {
   const files = new Map();
@@ -777,7 +778,7 @@ async function artifacts() {
         artifactCache.set(s.sid, { when: s.when, files });
       }
     }
-    for (const f of files) if (fs.existsSync(f.path)) out.push({ ...f, sid: s.sid, cwd: s.cwd, kind: s.kind, title: s.title, when: s.when });
+    for (const f of files) if (fs.existsSync(f.path)) { artifactPaths.add(f.path); out.push({ ...f, sid: s.sid, cwd: s.cwd, kind: s.kind, title: s.title, when: s.when }); }
   }
   return out;
 }
@@ -1212,7 +1213,7 @@ wss.on('connection', async (ws) => {
         }
         case 'reveal': {
           const p = String(msg.path || '');
-          if (!isAllowedFile(p) || !fs.existsSync(p)) break;
+          if ((!isAllowedFile(p) && !artifactPaths.has(p)) || !fs.existsSync(p)) break;
           if (IS_WIN) execFile('explorer.exe', [`/select,${path.resolve(p)}`]);
           else if (IS_MAC) execFile('open', ['-R', p]);
           else execFile('xdg-open', [path.dirname(p)]);

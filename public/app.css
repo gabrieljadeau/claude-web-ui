@@ -484,6 +484,7 @@ pre:hover .copy-btn { opacity: 1; }
 #searchFilters { margin: 2px 8px 8px; }
 #searchResults .sh { padding: 8px 12px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
 #searchResults .row svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
+#searchResults .row .reveal { flex: none; opacity: 0; } #searchResults .row:hover .reveal, #searchResults .row.sel .reveal { opacity: 1; }
 .search-foot { display: flex; gap: 14px; padding: 8px 12px; border-top: 1px solid var(--line2); color: var(--muted); font-size: 11.5px; } .search-foot kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-right: 3px; }
 .composer .under { margin: 6px 4px 0; }
 
