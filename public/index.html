@@ -228,9 +228,10 @@
   <!-- Projects -->
   <section id="viewProjects" class="view page" hidden>
     <div class="page-in">
-      <div class="page-head"><h1>Projects</h1><span class="spacer"></span><button class="btn dark" id="addProjectBtn">Add folder</button></div>
-      <p class="muted">A project is a folder on this computer. Claude works inside it for Code sessions and Cowork tasks.</p>
-      <div class="plist" id="projectList"></div>
+      <div class="page-head"><h1>Projects</h1></div>
+      <div class="cust-bar"><div class="ttabs"><button class="active">Your projects</button></div><span class="spacer"></span><button class="btn dark" id="addProjectBtn">New project</button></div>
+      <div class="cards" id="projectList"></div>
+      <p class="muted small">A project is a folder on this computer. Claude works inside it for Code sessions and Cowork tasks.</p>
     </div>
   </section>
 
@@ -246,10 +247,11 @@
   <!-- Routines -->
   <section id="viewRoutines" class="view page" hidden>
     <div class="page-in">
-      <div class="page-head"><h1>Routines</h1><span class="spacer"></span><button class="btn dark" id="newRoutineBtn">New routine</button></div>
-      <div class="pills" id="routineTabs"><button data-t="yours" class="active">Yours</button><button data-t="templates">Templates</button></div>
-      <div id="routinesYours"></div>
-      <div id="routinesTemplates" class="cards" hidden></div>
+      <div class="page-head"><div><h1 id="routinesTitle">Scheduled tasks</h1><p class="muted sub">Run tasks on a schedule or whenever you need them.</p></div><span class="spacer"></span><button class="btn dark" id="newRoutineBtn">New task</button></div>
+      <div id="routineTabs" hidden></div>
+      <div class="cards" id="routinesYours"></div>
+      <div class="divider"></div>
+      <div class="tpl-grid" id="routinesTemplates"></div>
     </div>
   </section>
 

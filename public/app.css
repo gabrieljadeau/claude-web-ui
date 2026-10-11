@@ -113,6 +113,28 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 .cust-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; } .cust-bar .toolbar { margin: 0; flex: 1; justify-content: flex-end; } .cust-bar .toolbar input { min-width: 0; }
 .cust-bar .btn.dark svg { width: 13px; height: 13px; margin-right: 5px; vertical-align: -2px; }
 .card.c .acts { display: flex; gap: 4px; align-items: center; flex: none; align-self: flex-start; }
+/* Projects and Scheduled tasks pages, card layouts like claude.ai */
+.ttabs { display: flex; gap: 2px; } .ttabs button { border: 0; background: none; padding: 6px 10px; border-radius: 7px; font-size: 13.5px; color: var(--muted); } .ttabs button.active { color: var(--ink); background: var(--soft); }
+.page-head .sub { margin: 2px 0 0; font-size: 13.5px; }
+.card.p { cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 100px; } .card.p:hover { border-color: var(--line); }
+.card.p .nm { font-weight: 600; } .card.p .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.p .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; color: var(--muted); font-size: 12px; min-height: 26px; }
+.card.p .acts { display: flex; gap: 4px; align-items: center; opacity: 0; transition: opacity .12s; } .card.p:hover .acts, .card.p:focus-within .acts { opacity: 1; } .card.p .acts .btn { padding: 3px 9px; font-size: 12px; }
+.card.task { cursor: pointer; display: flex; flex-direction: column; gap: 8px; } .card.task:hover { border-color: var(--line); }
+.card.task .head { display: flex; align-items: center; gap: 8px; } .card.task .head b { font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.task .st { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; } .card.task .st.on { background: var(--info); } .card.task .st.off { background: var(--warn); } .card.task .st.running { background: var(--accent); animation: pulse 1s infinite; }
+.card.task .desc { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card.task .foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+.sched { font-size: 11.5px; border-radius: 6px; padding: 2px 8px; background: #dfeedd; color: #2f6b3a; } .sched.soft { background: var(--soft); color: var(--muted); } .sched:empty { display: none; }
+:root[data-theme="dark"] .sched { background: #23392a; color: #9fd3a8; } @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sched { background: #23392a; color: #9fd3a8; } }
+:root[data-theme="dark"] .sched.soft, :root:not([data-theme="light"]) .sched.soft { background: var(--soft); color: var(--muted); }
+.empty-note.wide { grid-column: 1 / -1; padding: 10px 2px; }
+.divider { border-top: 1px solid var(--line2); margin: 24px 0 18px; }
+.tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+.tpl { display: flex; gap: 12px; padding: 8px; border-radius: 10px; cursor: pointer; border: 0; background: none; text-align: left; color: var(--ink); align-items: flex-start; }
+.tpl:hover { background: var(--soft); } .tpl .icon { width: 32px; height: 32px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; flex: none; } .tpl .icon svg { width: 15px; height: 15px; color: var(--muted); }
+.tpl .t { min-width: 0; } .tpl b { font-weight: 600; display: block; } .tpl .d { color: var(--muted); font-size: 13px; display: block; } .tpl .s { color: var(--muted); font-size: 12px; display: inline-flex; gap: 5px; align-items: center; margin-top: 3px; } .tpl .s svg { width: 12px; height: 12px; }
+@media (max-width: 760px) { .tpl-grid { grid-template-columns: 1fr; } }
 
 .welcome { margin: auto; width: min(var(--wrap), 92vw); padding: 40px 0 120px; }
 .welcome h1 { font-family: var(--serif); font-weight: 400; font-size: 38px; margin: 0 0 24px; letter-spacing: -.3px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }

@@ -1267,14 +1267,17 @@
   function renderProjects() {
     const box = $('projectList'); box.innerHTML = '';
     if (!S.projects.length) { box.innerHTML = '<div class="empty-page">' + tr('No projects yet. Add a folder to start.') + '</div>'; return; }
+    // Cards like claude.ai's Projects page: name, folder, session count and last activity; actions on hover.
     for (const p of S.projects) {
-      const n = S.sessions.filter((s) => s.cwd === p.path && !s.archived).length;
-      const r = el('div', 'prow'); r.innerHTML = `<span class="icon">${icon('folder')}</span><span class="t"><b></b><small></small></span>`;
-      r.querySelector('b').textContent = p.name; r.querySelector('small').textContent = p.path + ' · ' + (n === 1 ? tr('1 session') : tr('{n} sessions', { n }));
-      const a = el('button', 'btn', tr('New session')); a.onclick = () => { setTab(S.tab === 'cowork' ? 'cowork' : 'code'); showWelcome(p.path); };
-      const b = el('button', 'btn', tr('Cowork task')); b.onclick = () => { setTab('cowork'); showWelcome(p.path); };
-      const x = el('button', 'ib'); x.innerHTML = icon('trash'); x.title = tr('Remove from list (files are not deleted)'); x.onclick = () => send({ type: 'removeProject', path: p.path });
-      r.append(a, b, x); box.appendChild(r);
+      const mine = S.sessions.filter((s) => s.cwd === p.path && !s.archived); const n = mine.length; const last = mine.reduce((m, s) => Math.max(m, s.when), 0);
+      const r = el('div', 'card p'); r.innerHTML = `<b class="nm"></b><div class="path"></div><div class="foot"><span class="when"></span><span class="acts"></span></div>`;
+      r.querySelector('.nm').textContent = p.name; r.querySelector('.path').textContent = shortPath(p.path); r.title = p.path;
+      r.querySelector('.when').textContent = (n === 1 ? tr('1 session') : tr('{n} sessions', { n })) + (last ? ' · ' + ago(last) : '');
+      const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+      const a = el('button', 'btn', tr('New session')); a.onclick = stop(() => { setTab(S.tab === 'cowork' ? 'cowork' : 'code'); showWelcome(p.path); });
+      const b = el('button', 'btn', tr('Cowork task')); b.onclick = stop(() => { setTab('cowork'); showWelcome(p.path); });
+      const x = el('button', 'ib sm'); x.innerHTML = icon('trash'); x.title = tr('Remove from list (files are not deleted)'); x.onclick = stop(() => send({ type: 'removeProject', path: p.path }));
+      r.querySelector('.acts').append(a, b, x); r.onclick = () => { setTab(S.tab === 'cowork' ? 'cowork' : 'code'); showWelcome(p.path); }; box.appendChild(r);
     }
   }
   $('addProjectBtn').onclick = () => pickFolder(S.newFolder || S.home, (p) => send({ type: 'addProject', path: p }));
@@ -1303,28 +1306,24 @@
   function showRoutines() { showView('routines'); renderRoutinesPage(); }
   $('routineTabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; routineTab = b.dataset.t; renderRoutinesPage(); };
   $('newRoutineBtn').onclick = () => showRoutineEdit(null);
+  // Like claude.ai's Scheduled tasks page: your tasks as cards (status dot, prompt excerpt, schedule chip), templates listed below.
   function renderRoutinesPage() {
-    document.querySelectorAll('#routineTabs button').forEach((b) => b.classList.toggle('active', b.dataset.t === routineTab));
-    $('routinesYours').hidden = routineTab !== 'yours'; $('routinesTemplates').hidden = routineTab !== 'templates';
+    $('routinesTitle').textContent = space() === 'code' ? tr('Routines') : tr('Scheduled tasks');
     const y = $('routinesYours'); y.innerHTML = '';
-    if (!S.routines.length) y.innerHTML = `<div class="empty-page">${icon('clock')}<div>${tr('No routines yet.')}</div><div class="small">${tr('A routine is a prompt Claude runs on a schedule in a folder, while this app is open.')}</div></div>`;
-    else {
-      const rows = el('div', 'rows');
-      for (const r of S.routines) {
-        const running = S.sessions.some((s) => s.routineId === r.id && s.status !== 'idle');
-        const row = el('div', 'rrow'); row.style.cursor = 'pointer';
-        row.innerHTML = `<span class="icon">${icon('clock')}</span><span class="t"><b></b><span class="tag"></span><div></div></span><span class="acts"></span>`;
-        row.querySelector('b').textContent = r.name; row.querySelector('.tag').textContent = running ? tr('Running') : r.enabled ? tr('On') : tr('Paused');
-        row.querySelector('div').textContent = describeSchedule(r.schedule) + ' · ' + folderName(r.cwd) + (r.enabled && r.nextRun ? ' · ' + tr('next {when}', { when: fmtWhen(r.nextRun) }) : '');
-        const run = el('button', 'btn', tr('Run now')); run.onclick = (e) => { e.stopPropagation(); send({ type: 'routineRun', id: r.id }); };
-        row.querySelector('.acts').append(run); row.onclick = () => showRoutine(r.id); rows.appendChild(row);
-      }
-      y.appendChild(rows);
+    if (!S.routines.length) y.innerHTML = `<div class="empty-note wide">${tr('No tasks yet. Pick a template below, or create one.')}</div>`;
+    for (const r of S.routines) {
+      const running = S.sessions.some((s) => s.routineId === r.id && s.status !== 'idle');
+      const c = el('div', 'card task'); c.innerHTML = `<div class="head"><b></b><span class="st"></span></div><div class="desc"></div><div class="foot"><span class="sched"></span><span class="sched soft"></span></div>`;
+      c.querySelector('b').textContent = r.name; c.querySelector('.desc').textContent = r.prompt || '';
+      c.querySelector('.st').className = 'st ' + (running ? 'running' : r.enabled ? 'on' : 'off'); c.querySelector('.st').title = running ? tr('Running') : r.enabled ? tr('On') : tr('Paused');
+      c.querySelector('.sched').textContent = describeSchedule(r.schedule) + (r.enabled && r.nextRun ? ' · ' + tr('next {when}', { when: fmtWhen(r.nextRun) }) : '');
+      c.querySelector('.sched.soft').textContent = folderName(r.cwd);
+      c.onclick = () => showRoutine(r.id); y.appendChild(c);
     }
     const t = $('routinesTemplates'); t.innerHTML = '';
     for (const tpl of ROUTINE_TEMPLATES) {
-      const c = el('div', 'card c'); c.innerHTML = `<span class="icon">${icon('clock')}</span><span class="t"><b></b><div></div><small></small></span>`;
-      c.querySelector('b').textContent = tpl.name; c.querySelector('div').textContent = tpl.desc; c.querySelector('small').textContent = describeSchedule(tpl.schedule);
+      const c = el('button', 'tpl'); c.innerHTML = `<span class="icon">${icon('clock')}</span><span class="t"><b></b><span class="d"></span><span class="s">${icon('clock')}<span></span></span></span>`;
+      c.querySelector('b').textContent = tpl.name; c.querySelector('.d').textContent = tpl.desc; c.querySelector('.s span').textContent = describeSchedule(tpl.schedule);
       c.onclick = () => showRoutineEdit(null, tpl); t.appendChild(c);
     }
   }
