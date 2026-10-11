@@ -148,7 +148,8 @@ body.space-code .welcome { margin: 0; width: 100%; max-width: none; height: 100%
 body.space-code .welcome h1 { justify-content: flex-start; font-family: inherit; font-size: 17px; font-weight: 500; gap: 8px; margin: 0; letter-spacing: 0; }
 body.space-code .welcome h1 .logo { width: 20px; height: 20px; }
 body.space-code .welcome .composer-box { margin: auto auto 0; width: min(var(--wrap), 100%); }
-body.space-code .welcome .suggest { display: none; }
+body.space-code .welcome .suggest, body.space-code .howto { display: none; }   /* the Code tab keeps the composer at the bottom: no card, a Map button in the title row instead */
+.map-chip { display: none; margin-left: auto; font-size: 12.5px; padding: 4px 10px; } body.space-code .map-chip { display: inline-flex; }
 .suggest { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
 .howto { width: min(680px, 100%); margin: 36px auto 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 16px 18px 10px; }
 .howto[hidden] { display: none; }

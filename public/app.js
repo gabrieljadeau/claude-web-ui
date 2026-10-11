@@ -111,7 +111,7 @@
   // Welcome screen: the "how it works" card (hidden per browser once dismissed) and the map of the app.
   $('howto').hidden = store.get('howtoHidden', false);
   $('howtoHide').onclick = () => { store.set('howtoHidden', true); $('howto').hidden = true; };
-  $('mapBtn').onclick = () => $('mapDlg').showModal();
+  $('mapBtn').onclick = $('mapBtnCode').onclick = () => $('mapDlg').showModal();
   $('mapClose').onclick = () => $('mapDlg').close();
   function renderUpdate() {
     const u = S.update || {}, b = $('updateBtn');
