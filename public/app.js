@@ -23,6 +23,7 @@
     showArchived: store.get('showArchived', false),
     connectSkipped: false,
     newFolder: store.get('lastFolder', ''), newMode: null, newModel: null, newEffort: null,
+    selecting: false, selected: new Set(), suggest: null, suggesting: false,   // sidebar select mode (bulk delete), AI suggestions {sid: why}
   };
   const KIND_LABEL = { chat: tr('Chat'), cowork: tr('Cowork'), code: tr('Code'), routine: tr('Routine') };
   const MODE_LABEL = { auto: tr('Auto (Claude decides, asks when unsure)'), acceptEdits: tr('Auto-accept edits'), default: tr('Ask before changes'), bypassPermissions: tr('Autonomous (never asks)'), plan: tr('Plan only') };
@@ -90,6 +91,7 @@
       case 'termOpened': onTermOpened(m); break;
       case 'toast': toast(m.text); break;
       case 'error': toast(m.message, true); break;
+      case 'cleanupSuggest': onCleanupSuggest(m); break;
     }
     if (onceHandlers.length) onceHandlers.splice(0).forEach((h) => h(m));
   }
@@ -206,8 +208,14 @@
       const pinned = items.filter((s) => s.pinned);
       if (pinned.length) { section(tr('Pinned')); for (const s of pinned.sort((a, b) => b.when - a.when)) box.appendChild(sessionRow(s)); }
       const rest = items.filter((s) => !s.pinned).sort((a, b) => b.when - a.when);
-      const filter = el('button', 'ib sm'); filter.title = tr('Refresh'); filter.innerHTML = icon('filter'); filter.onclick = () => send({ type: 'sessions' });
+      const filter = el('button', 'ib sm'); filter.title = tr('Options'); filter.innerHTML = icon('filter');
+      filter.onclick = (e) => menu(e, [
+        [tr('Refresh'), () => send({ type: 'sessions' })],
+        [tr('Select…'), () => setSelecting(true)],
+        [tr('Suggest chats to delete'), suggestCleanup],
+      ]);
       section(tr('Chats and tasks'), filter);
+      if (S.selecting || S.suggesting) box.appendChild(selectBar());
       if (!rest.length && !pinned.length) { box.appendChild(el('div', 'empty-list', tr('Chats and tasks you start will show up here'))); return; }
       for (const s of rest) box.appendChild(sessionRow(s));
       return;
@@ -265,6 +273,18 @@
     b.tabIndex = 0; b.setAttribute('role', 'button');
     b.innerHTML = `<span class="st"></span><span class="t"><span class="tt"></span></span><button class="ib sm more" title="${tr('More actions')}">${icon('vmore')}</button>`;
     b.querySelector('.tt').textContent = s.title;
+    if (S.selecting && space() === 'chat') {
+      // select mode: a checkbox replaces the status dot, a click toggles instead of opening
+      const on = S.selected.has(s.sid);
+      b.classList.add('selectable'); b.classList.toggle('sel', on);
+      b.querySelector('.st').outerHTML = `<span class="cb${on ? ' on' : ''}">${icon('check')}</span>`;
+      const why = S.suggest?.[s.sid]; if (why) b.querySelector('.t').appendChild(el('small', null, why));
+      b.querySelector('.more').remove();
+      b.onclick = () => toggleSelected(s.sid);
+      b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelected(s.sid); } else if (e.key === 'Escape') setSelecting(false); };
+      b.title = why ? `${s.title}\n${why}` : s.title;
+      return b;
+    }
     const nArt = S.artifacts.reduce((n, a) => n + (a.sid === s.sid ? 1 : 0), 0);
     if (nArt) { const g = el('span', 'badge art', nArt); g.title = nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt }); b.querySelector('.more').before(g); }
     b.title = `${s.title}\n${s.status === 'waiting' ? tr('Needs your approval') + ' · ' : s.status === 'running' ? tr('Working…') + ' · ' : ''}${KIND_LABEL[s.kind]}${s.kind === 'chat' ? '' : ' · ' + folderName(s.cwd)} · ${ago(s.when)}`;
@@ -282,6 +302,48 @@
     if (!s || !confirm(tr('Delete “{title}”? This cannot be undone.', { title: s.title || tr('this conversation') }))) return;
     send({ type: 'delete', sid: s.sid });
     if (S.sid === s.sid || (S.info && s.sdkId && s.sdkId === S.info.sdkId)) showWelcome();
+  }
+  // ---- select mode: tick chats in the sidebar and delete them in one go; Claude can pre-tick the throwaway ones
+  function setSelecting(on) {
+    S.selecting = on; if (!on) { S.selected = new Set(); S.suggest = null; }
+    renderList();
+  }
+  function toggleSelected(sid) { if (S.selected.has(sid)) S.selected.delete(sid); else S.selected.add(sid); renderList(); }
+  const selectableSids = () => visibleSessions('chat').map((s) => s.sid);
+  function selectBar() {
+    const bar = el('div', 'sel-bar');
+    if (S.suggesting) { bar.appendChild(el('span', 'sel-n', tr('Looking for chats to delete…'))); return bar; }
+    const n = S.selected.size, all = selectableSids();
+    bar.appendChild(el('span', 'sel-n', S.suggest && n ? tr('{n} suggested', { n }) : tr('{n} selected', { n })));
+    const btn = (label, fn, cls) => { const b = el('button', 'sel-btn' + (cls ? ' ' + cls : ''), label); b.onclick = fn; bar.appendChild(b); return b; };
+    btn(n === all.length && all.length ? tr('None') : tr('All'), () => { S.selected = n === all.length ? new Set() : new Set(all); renderList(); });
+    const del = btn(tr('Delete'), deleteSelected, 'danger'); del.disabled = !n;
+    btn(tr('Cancel'), () => setSelecting(false));
+    return bar;
+  }
+  function deleteSelected() {
+    const sids = [...S.selected].filter((sid) => S.sessions.some((s) => s.sid === sid));
+    if (!sids.length) return;
+    const one = S.sessions.find((s) => s.sid === sids[0]);
+    const q = sids.length === 1 ? tr('Delete “{title}”? This cannot be undone.', { title: one.title || tr('this conversation') }) : tr('Delete {n} chats? This cannot be undone.', { n: sids.length });
+    if (!confirm(q)) return;
+    send({ type: 'deleteMany', sids });
+    if (sids.some((sid) => S.sid === sid || (S.info && S.sessions.find((s) => s.sid === sid)?.sdkId === S.info.sdkId))) showWelcome();
+    setSelecting(false);
+  }
+  function suggestCleanup() {
+    if (S.suggesting) return;
+    S.suggesting = true; S.selecting = true; S.selected = new Set(); S.suggest = null; renderList();
+    send({ type: 'suggestCleanup' });
+  }
+  function onCleanupSuggest(m) {
+    S.suggesting = false;
+    if (m.error) { toast(m.error, true); setSelecting(false); return; }
+    const items = (m.items || []).filter((it) => S.sessions.some((s) => s.sid === it.sid));
+    if (!items.length) { toast(tr('Nothing worth deleting found')); setSelecting(false); return; }
+    S.suggest = Object.fromEntries(items.map((it) => [it.sid, it.why || '']));
+    S.selected = new Set(items.map((it) => it.sid)); S.selecting = true;
+    renderList();
   }
   function sessionMenu(e, s) {
     menu(e, [
@@ -1694,7 +1756,7 @@
     else if (mod && e.key.toLowerCase() === 'u') { e.preventDefault(); activeComposer().openFiles(); }
     else if (mod && e.shiftKey && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); if (S.view === 'session' && S.info) deleteSession({ sid: S.info.sid, sdkId: S.info.sdkId, title: S.info.title }); }
     else if (mod && e.key.toLowerCase() === '.') { e.preventDefault(); if (S.view === 'session') openPanel(!paneState.progress, true); }
-    else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (fullPane) setFull(fullPane, false); }
+    else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (fullPane) setFull(fullPane, false); if (S.selecting && !S.suggesting) setSelecting(false); }
   });
 
   // ------------------------------------------------------------- settings

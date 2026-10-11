@@ -624,3 +624,11 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 .working.bar { position: relative; top: -14px; margin: 0; gap: 8px; padding: 6px 14px 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); font-size: 13px; white-space: nowrap; max-width: calc(100% - 32px); }
 .working.bar .lbl { overflow: hidden; text-overflow: ellipsis; }
 .vlang { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; font-size: 13px; color: var(--ink); margin-right: 4px; }
+/* sidebar select mode: bulk delete */
+.sel-bar { display: flex; align-items: center; gap: 4px; padding: 4px 6px 6px 8px; font-size: 12px; color: var(--muted); }
+.sel-bar .sel-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-btn { border: 0; background: none; border-radius: 6px; padding: 3px 7px; font-size: 12px; color: var(--ink); cursor: pointer; }
+.sel-btn:hover { background: var(--hover); } .sel-btn.danger { color: var(--danger, #c0392b); } .sel-btn:disabled { opacity: .4; cursor: default; background: none; }
+.row .cb { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; color: transparent; background: var(--bg, transparent); }
+.row .cb svg { width: 11px; height: 11px; stroke-width: 3; } .row .cb.on { background: var(--ink); border-color: var(--ink); color: var(--bg, #fff); }
+.row.selectable { min-height: 30px; } .row.sel { background: var(--hover); } .row.selectable .t small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

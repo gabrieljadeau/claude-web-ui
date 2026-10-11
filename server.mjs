@@ -858,6 +858,36 @@ async function artifacts() {
   }
   return out;
 }
+// Delete one session wherever it lives: a running runtime, its transcript on disk, and our metadata for it.
+async function removeSession(sid) {
+  const rt = runtimes.get(sid) || bySdk.get(sid);
+  const sdkId = rt?.sdkId || sid;
+  if (rt) { denyAllPending(rt, 'Deleted.'); termKill(rt); rt.abort?.abort(); runtimes.delete(rt.localId); if (rt.sdkId) bySdk.delete(rt.sdkId); }
+  if (sdkId) { await deleteSession(sdkId, rt?.cwd ? { dir: rt.cwd } : undefined).catch(() => {}); delete state.meta[sdkId]; saveState(); }
+}
+// "Suggest chats to delete": a small model reads the chat list (titles, age, size) and picks the throwaway ones —
+// tests, one-word greetings, duplicates, empty chats. The user still reviews and confirms in the sidebar.
+async function suggestCleanup() {
+  const disk = await listing();
+  const size = new Map(disk.map((s) => [s.sessionId, s.messageCount ?? s.messages?.length ?? null]));
+  const all = (await sidebar()).filter((s) => (s.kind === 'chat' || s.kind === 'cowork') && !s.pinned && !s.archived && s.status === 'idle');
+  if (!all.length) return { items: [] };
+  const items = all.slice(0, 300);
+  const day = 86400000, now = Date.now();
+  const lines = items.map((s, i) => { const n = size.get(s.sdkId); return `${i + 1}. "${String(s.title).replace(/"/g, "'").slice(0, 90)}" · ${Math.max(0, Math.round((now - s.when) / day))}d old${n != null ? ` · ${n} msgs` : ''}${s.kind === 'cowork' ? ' · task' : ''}`; }).join('\n');
+  const prompt = `Here is a list of chats from a Claude app. Pick the ones that are clearly throwaway and safe to delete: connection tests, one-word greetings ("say hello", "reply with one word"), trivial questions already asked again later (keep the newest copy), untitled or empty chats. Keep anything that looks like real work, a project, a plan, code, or a document. When unsure, keep it.\n\nReply with JSON only: {"delete":[{"i":<number>,"why":"<4 to 8 words, in the language of the chat titles>"}]}\n\n${lines}`;
+  try {
+    const q = query({ prompt, options: { cwd: PROBE_DIR, tools: [], maxTurns: 1, model: 'haiku', permissionMode: 'default', systemPrompt: 'You tidy chat lists. Reply with JSON only, no prose, no code fence.' } });
+    let out = '';
+    for await (const m of q) if (m.type === 'result' && m.subtype === 'success') out = String(m.result || '');
+    const json = out.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+    const picked = JSON.parse(json).delete || [];
+    const seen = new Set();
+    const res = [];
+    for (const p of picked) { const s = items[Number(p.i) - 1]; if (!s || seen.has(s.sid)) continue; seen.add(s.sid); res.push({ sid: s.sid, why: String(p.why || '').slice(0, 120) }); }
+    return { items: res };
+  } catch (e) { return { items: [], error: 'Could not get suggestions: ' + (e?.message || e) }; }
+}
 function firstUserText(rt) { const u = rt.items.find((i) => i.type === 'user'); return u ? u.text.split('\n')[0].slice(0, 80) : ''; }
 
 let sidebarTimer = null;
@@ -1266,13 +1296,14 @@ wss.on('connection', async (ws) => {
           sidebarDirty();
           break;
         }
-        case 'delete': {
-          const sdkId = rt?.sdkId || msg.sid;
-          if (rt) { denyAllPending(rt, 'Deleted.'); termKill(rt); rt.abort?.abort(); runtimes.delete(rt.localId); if (rt.sdkId) bySdk.delete(rt.sdkId); }
-          if (sdkId) { await deleteSession(sdkId, rt?.cwd ? { dir: rt.cwd } : undefined).catch(() => {}); delete state.meta[sdkId]; saveState(); }
+        case 'delete': { await removeSession(msg.sid); invalidateListing(); sidebarDirty(); break; }
+        case 'deleteMany': {
+          // sidebar select mode: one listing refresh for the whole batch
+          for (const sid of (Array.isArray(msg.sids) ? msg.sids : []).slice(0, 500)) await removeSession(String(sid));
           invalidateListing(); sidebarDirty();
           break;
         }
+        case 'suggestCleanup': send({ type: 'cleanupSuggest', ...(await suggestCleanup()) }); break;
         case 'sessions': invalidateListing(); send({ type: 'sessions', items: await sidebar(), projects: projects() }); break;
         case 'artifacts': send({ type: 'artifacts', items: await artifacts() }); break;
         case 'dashboard': send({ type: 'dashboard', usage: state.usage.slice(-3000), items: await sidebar(), routines: state.routines }); break;
