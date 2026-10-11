@@ -445,7 +445,7 @@ function emit(rt, ev) {
     case 'toolUse': if (String(ev.name).startsWith('mcp__browser__')) liveBrowser.wanted = null; if (!ev.parent) rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false, parent: ev.parent || null }); break;
     case 'subText': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.parent); if (t) t.subText = (t.subText ? t.subText + '\n' : '') + ev.text; break; }
     case 'toolResult': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.id); if (t) { t.result = ev.content; t.isError = ev.isError; if (ev.images?.length) t.images = ev.images; } break; }
-    case 'permission': rt.items.push({ type: 'perm', id: ev.id, tool: ev.tool, input: ev.input, answer: null }); break;
+    case 'permission': rt.items.push({ type: 'perm', id: ev.id, tool: ev.tool, input: ev.input, noAlways: ev.noAlways, answer: null }); break;
     case 'permitted': { const p = rt.items.find((i) => i.type === 'perm' && i.id === ev.id); if (p) p.answer = ev.answer; break; }
     case 'note': if (ev.err && sameError(rt, ev.text)) return; rt.items.push({ type: 'note', text: ev.text, err: !!ev.err }); break;
     case 'done': rt.liveText = ''; rt.liveThinking = ''; if (!ev.ok && sameError(rt, ev.message)) ev = { ...ev, message: null }; rt.items.push({ type: 'done', ok: ev.ok, cost: ev.cost, ms: ev.ms, model: ev.model, message: ev.message }); break;
@@ -538,6 +538,9 @@ function queryOptions(rt, ac) {
   };
   if (rt.mode === 'bypassPermissions' && !rt.shell) opts.allowDangerouslySkipPermissions = true;
   if (kind === 'chat') opts.tools = rt.shell ? ['Read', 'WebFetch', 'WebSearch', 'Bash'] : ['Read', 'WebFetch', 'WebSearch'];
+  // Claude Code lets "safe" read-only commands (ls, cat, wc…) through without asking; in a Chat with a terminal every
+  // command outside our own whitelist must reach the approval card, so a hook forces the question before its own rules.
+  if (rt.shell) opts.hooks = { PreToolUse: [{ matcher: 'Bash', hooks: [async (h) => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: safeShellCommand(h.tool_input?.command) ? 'allow' : 'ask', permissionDecisionReason: 'Chat terminal: the user approves each command.' } })] }] };
   if (rt.title && !rt.sdkId) opts.title = rt.title;
   return opts;
 }

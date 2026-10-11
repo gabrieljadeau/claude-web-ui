@@ -418,6 +418,7 @@
       <div class="set-row"><div><b>Permissions for Code sessions</b></div><select id="setMode"><option value="default">Ask before changes</option><option value="auto">Auto: Claude decides, asks when unsure</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="plan">Plan only</option></select></div>
       <div class="set-row"><div><b>Permissions for Cowork and routines</b></div><select id="setCoworkMode"><option value="auto">Auto: Claude decides, asks when unsure</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes</option></select></div>
       <div class="set-row"><div><b>Browser actions</b><small>Let Claude open and drive a web browser (Playwright) in new sessions.</small></div><label class="switch"><input type="checkbox" id="setBrowser"><span></span></label></div>
+      <div class="set-row"><div><b>Terminal in Chat</b><small>Let Claude run shell commands in new chats, from your home folder. Every command waits for your approval, except a few harmless ones such as opening an application.</small></div><label class="switch"><input type="checkbox" id="setChatShell"><span></span></label></div>
     </div>
     <div data-page="feedback" class="set-page" hidden>
       <h3>Feedback</h3>

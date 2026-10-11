@@ -643,7 +643,7 @@
     const pre = el('pre', null, formatInput(p.tool, p.input));
     const btns = el('div', 'btns');
     const mk = (label, cls, allow, always) => { const b = el('button', 'btn ' + cls, label); b.onclick = () => { send({ type: 'permit', sid: S.sid, id: p.id, tool: p.tool, allow, always }); markPerm(card, allow ? 'allow' : 'deny', always); if (s) { s.status = allow ? 'running' : 'error'; if (s.row) s.row.className = 'step ' + s.status; updateActRow(s); } showWorking(allow ? d.label : tr('Continuing')); }; return b; };
-    btns.append(mk(tr('Allow'), 'dark', true, false), mk(p.tool.startsWith('mcp__browser__') ? tr('Allow all browser actions') : tr('Always allow in this chat'), '', true, true), mk(tr('Refuse'), '', false, false));
+    btns.append(mk(tr('Allow'), 'dark', true, false), ...(p.noAlways ? [] : [mk(p.tool.startsWith('mcp__browser__') ? tr('Allow all browser actions') : tr('Always allow in this chat'), '', true, true)]), mk(tr('Refuse'), '', false, false));
     card.append(q, pre, btns); ensureReply().appendChild(card); V.group = null;
     if (answer) markPerm(card, answer); else showWorking(tr('Waiting for your approval'));
     scrollDown(true);
@@ -1672,7 +1672,7 @@
     fillModelSelect($('setModel'), s.model || '');
     $('setEffort').value = s.effort || '';
     $('setMode').value = s.mode || 'default'; $('setCoworkMode').value = s.coworkMode || 'auto';
-    $('setBrowser').checked = s.browser !== false; $('setLang').value = s.lang || 'fr-FR'; $('setUiLang').value = store.get('uiLang', 'auto');
+    $('setBrowser').checked = s.browser !== false; $('setChatShell').checked = !!s.chatShell; $('setLang').value = s.lang || 'fr-FR'; $('setUiLang').value = store.get('uiLang', 'auto');
     $('setSpeak').checked = store.get('speak', false); $('setHandsFree').checked = store.get('handsFree', false); $('setArchived').checked = S.showArchived;
     if (document.activeElement !== $('setName')) $('setName').value = s.name || S.user || '';
     if (document.activeElement !== $('setRepo')) $('setRepo').value = s.repo || S.repo || '';
@@ -1692,6 +1692,7 @@
   $('setMode').onchange = () => send({ type: 'settings', mode: $('setMode').value });
   $('setCoworkMode').onchange = () => send({ type: 'settings', coworkMode: $('setCoworkMode').value });
   $('setBrowser').onchange = () => send({ type: 'settings', browser: $('setBrowser').checked });
+  $('setChatShell').onchange = () => send({ type: 'settings', chatShell: $('setChatShell').checked });
   $('setLang').onchange = () => { send({ type: 'settings', lang: $('setLang').value }); setTimeout(() => window.Voice?.populateVoices(), 300); };
   // Interface language: remembered per browser like the theme; the page reloads so every string is rebuilt.
   $('setUiLang').onchange = () => { store.set('uiLang', $('setUiLang').value); location.reload(); };
