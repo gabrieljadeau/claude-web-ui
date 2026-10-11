@@ -359,6 +359,7 @@
       <div class="set-row"><div><b>Your name</b><small>Used in the greeting.</small></div><input id="setName" maxlength="60" placeholder="Name"></div>
       <h3 style="margin-top:18px">Appearance</h3>
       <div class="set-row"><div><b>Theme</b></div><div class="pills small" id="themePills"><button data-v="auto">System</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+      <div class="set-row"><div><b>Interface language</b><small>Applies after the page reloads.</small></div><select id="setUiLang"><option value="auto">System</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="it">Italiano</option><option value="de">Deutsch</option></select></div>
       <div class="set-row"><div><b>Transcript text size</b><small>Size of the conversation text.</small></div><div class="pills small" id="sizePills"><button data-v="s">Small</button><button data-v="m">Medium</button><button data-v="l">Large</button></div></div>
       <div class="set-row"><div><b>Transcript width</b><small>Maximum width of the transcript and composer.</small></div><div class="pills small" id="widthPills"><button data-v="n">Narrow</button><button data-v="m">Medium</button><button data-v="w">Wide</button></div></div>
       <div class="set-row"><div><b>Show archived chats</b><small>Archived chats stay on disk but are hidden from Recents.</small></div><label class="switch"><input type="checkbox" id="setArchived"><span></span></label></div>
@@ -457,6 +458,7 @@
 <div id="toasts"></div>
 <div id="menu" class="menu" hidden></div>
 
+<script src="/i18n.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

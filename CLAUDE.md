@@ -9,4 +9,9 @@
 ## Look and feel
 
 - The interface mirrors claude.ai: no accent-coloured borders on inputs or the composer, Chat/Cowork toggle and model picker inside the composer, a single-row pill composer in conversations with the "Claude is AI…" footer, title as a dropdown, accordion side panel.
+## Interface language
+
+- Every user-visible string is English in the source and goes through `tr('…')` in `app.js` (or `tr('… {n} …', { n })` with placeholders); `public/i18n.js` holds the FR/ES/IT/DE table keyed by the English text and translates the static `index.html` at load. A new string needs a row in that table, or it shows in English.
+- Verify with `I18N.missing` in the browser console after switching the language in Settings › General.
+
 - Verify changes in the browser pane with this session's own server (`PORT=<free port> NO_OPEN=1 node server.mjs`; the tokenized link is printed on start). Port 3737 belongs to another session's server.
