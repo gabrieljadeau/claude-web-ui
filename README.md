@@ -30,7 +30,7 @@ Everything runs on your own computer, on `127.0.0.1` only. Nothing is exposed to
 ## Install and run (Windows)
 
 ```bat
-git clone https://github.com/<owner>/claude-web-ui.git
+git clone https://github.com/gabrieljadeau/claude-web-ui.git
 cd claude-web-ui
 start.bat
 ```
@@ -41,11 +41,22 @@ Keep the black window open while you use the interface; close it (or press Ctrl+
 ## Install and run (macOS / Linux)
 
 ```bash
-git clone https://github.com/<owner>/claude-web-ui.git
+git clone https://github.com/gabrieljadeau/claude-web-ui.git
 cd claude-web-ui
 npm install
 npm start
 ```
+
+## Update to the latest version
+
+In the `claude-web-ui` folder:
+
+```bat
+git pull
+npm install
+```
+
+Then start it again with `start.bat` (or `npm start`).
 
 ## Notes
 
