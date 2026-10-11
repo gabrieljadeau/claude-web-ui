@@ -57,7 +57,7 @@ const REPO = detectRepo();
 const PROMPTS = {
   common: 'You are being used through a local web interface on the user\'s computer (Claude Web UI). Keep answers readable: short paragraphs, lists where helpful.',
   chat: 'This is a general conversation ("Chat"): you have no project folder. You can read files the user attaches and fetch web pages, nothing else. Do not try to run commands or edit files.',
-  chatShell: 'This is a general conversation ("Chat") with a terminal: you have no project folder, but you can run shell commands with the Bash tool. They run in the user\'s home folder. Use the terminal for what the user asks on their computer: open an application (open -a Name), look something up, launch a script. Every command is shown to the user, who approves or refuses it before it runs (a few harmless ones such as "open -a App" run directly), so keep commands short, one action each, and say in a few words what each one does. Do not create or edit files unless the user asks. You can also read files the user attaches and fetch web pages.',
+  chatShell: 'This is a general conversation ("Chat") with a terminal: you have no project folder, but you can run shell commands with the Bash tool. They run in the user\'s home folder. Use the terminal for what the user asks on their computer: open an application (open -a Name), look something up, launch a script. Every command is shown to the user, who approves or refuses it before it runs (a few harmless ones run directly: "open -a App", "open <file or url>", "say <text>", pwd, date, ls), so keep commands short, one action each, and say in a few words what each one does. Do not create or edit files unless the user asks. You can also read files the user attaches and fetch web pages.',
   cowork: 'This is a "Cowork" task: the user gave you a folder to work in autonomously. Plan briefly, do the work, save results as files in that folder, and finish with a short summary of what you produced and where.',
   code: 'This is a "Code" session in a project folder, like the claude terminal command.',
   voice: 'The user is talking to you by voice and hears your reply through a speech synthesizer. Answer as in a spoken conversation: a few short, natural sentences, in the language the user speaks. No markdown, no headings, no lists, no tables, no code blocks and no URLs (describe them in words instead). Give detail only when asked.',
@@ -477,12 +477,15 @@ function allowKey(toolName) {
 // Anything with a shell operator (;, &&, |, redirection, substitution) always asks.
 const SAFE_SHELL = [
   /^open -a ("[^"]+"|'[^']+'|[\w.-]+)( ("[^"]+"|'[^']+'|~?[\w./:-]+))?$/,   // open -a Safari [file or url]
+  /^open ("[^"]+"|'[^']+'|~?[\w./:%?=#+,@-]+)$/,                          // open a file, folder or URL with its default app
+  /^say( -v ("[^"]+"|'[^']+'|[\w-]+))? .+$/,                              // speak a sentence
   /^(pwd|date|whoami|uptime|cal)$/,
   /^ls( -[alhtrF]+)*( ~?[\w./-]+)?$/,
 ];
 function safeShellCommand(cmd) {
   const c = String(cmd || '').trim();
-  if (!c || /[;&|<>`$\n\\]/.test(c)) return false;
+  const bare = c.replace(/"[^"`$\\]*"|'[^']*'/g, '""');   // quoted text may hold & ; | < > (but not $ or `, which still expand)
+  if (!c || /[;&|<>`$\n\\]/.test(bare)) return false;
   return SAFE_SHELL.some((re) => re.test(c));
 }
 
