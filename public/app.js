@@ -122,6 +122,10 @@
   function setTab(tab) {
     S.tab = tab; store.set('tab', tab);
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === space()));
+    // The Code space is its own product on claude.ai: "Claude Code", Routines, task composer docked at the bottom.
+    document.body.classList.toggle('space-code', space() === 'code');
+    $('brand').textContent = space() === 'code' ? 'Claude Code' : 'Claude';
+    $('navRoutines').querySelector('span').textContent = space() === 'code' ? 'Routines' : 'Scheduled';
     renderList();
     if (S.view === 'welcome') showWelcome();
   }
@@ -265,8 +269,9 @@
     if (folder) { S.newFolder = folder; if (S.tab === 'chat') setTab('code'); }
     S.newMode = null; S.newModel = null; S.newEffort = null;
     const first = (S.user || '').split(' ')[0];
-    $('welcomeTitle').textContent = first ? `Welcome, ${first}` : 'Welcome';
-    welcomeComposer.setPlaceholder('How can I help you today?');
+    const code = S.tab === 'code';
+    $('welcomeTitle').textContent = code ? (first ? `What's up next, ${first}?` : "What's up next?") : (first ? `Welcome, ${first}` : 'Welcome');
+    welcomeComposer.setPlaceholder(code ? 'Describe a task or ask a question' : 'How can I help you today?');
     renderWelcomeChips(); renderSuggest();
     welcomeComposer.focus();
   }
@@ -282,7 +287,10 @@
     }
     $('modelChipText').textContent = modelLabel(S.newModel ?? S.settings.model ?? '');
     $('effortChipText').textContent = effortShort(S.newEffort ?? S.settings.effort ?? '');
+    $('modeChip').hidden = S.tab !== 'code';
+    $('modeChipText').textContent = MODE_SHORT[S.newMode || S.settings.mode || 'default'] || S.newMode || S.settings.mode;
   }
+  $('modeChip').onclick = (e) => menu(e, Object.entries(MODE_LABEL).map(([v, l]) => [l, () => { S.newMode = v; renderWelcomeChips(); }]), 'Permissions');
   const effortShort = (v) => ({ '': 'Default', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Very high', max: 'Max' }[v] || v);
   const MODEL_DESC = { '': 'What Claude Code is set to use', opus: 'For complex work and everyday tasks', sonnet: 'Most efficient for simpler tasks', haiku: 'Fastest for quick answers' };
   // One picker like claude.ai: models with a description and a check mark, then Effort › and More models ›.
@@ -307,6 +315,7 @@
   const SUGGEST = [['edit', 'Write', 'Help me write '], ['skill', 'Learn', 'Explain, step by step, '], ['code', 'Code', 'Write code that '], ['file', 'Summarize', 'Summarize the attached files: '], ['dash', 'Plan', 'Help me plan ']];
   function renderSuggest() {
     const box = $('suggest'); box.innerHTML = '';
+    if (S.tab === 'code') return;
     for (const [ic, label, prefix] of SUGGEST) { const b = el('button', 'sbtn'); b.innerHTML = icon(ic); b.appendChild(el('span', null, label)); b.onclick = () => welcomeComposer.setText(prefix); box.appendChild(b); }
   }
 
@@ -1144,7 +1153,7 @@
   }
   function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files }); }
   // Inside the welcome composer: Chat/Cowork toggle and project folder on the left, the model picker on the right (like claude.ai).
-  welcomeComposer.slot.append($('kindSeg'), $('projectChip')); welcomeComposer.slotR.prepend($('modelChip'));
+  welcomeComposer.slot.append($('kindSeg'), $('projectChip'), $('modeChip')); welcomeComposer.slotR.prepend($('modelChip'));
   $('welcomeChips').remove();
   const activeComposer = () => (S.view === 'session' ? sessionComposer : welcomeComposer);
   let dragDepth = 0;
