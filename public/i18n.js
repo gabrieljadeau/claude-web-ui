@@ -127,6 +127,7 @@
     'Cowork': ['Cowork', 'Cowork', 'Cowork', 'Cowork'],
     'Code': ['Code', 'Code', 'Code', 'Code'],
     'Routine': ['Routine', 'Rutina', 'Routine', 'Routine'],
+    'Date': ['Date', 'Fecha', 'Data', 'Datum'],
     'Project': ['Projet', 'Proyecto', 'Progetto', 'Projekt'],
     'Select folder…': ['Choisir un dossier…', 'Elegir carpeta…', 'Scegli una cartella…', 'Ordner wählen…'],
     'Browse for a folder…': ['Parcourir…', 'Buscar una carpeta…', 'Sfoglia…', 'Ordner suchen…'],

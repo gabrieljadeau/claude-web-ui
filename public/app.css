@@ -665,3 +665,9 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 /* artifacts: "View" opens the file itself in a new tab */
 a.btn, a.ib { text-decoration: none; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
 a.ib { color: var(--muted); } a.ib:hover { color: var(--ink); }
+
+/* Sessions list: Project / Date view switch in the section head */
+.sec-extra { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.view-tog { display: inline-flex; gap: 0; background: var(--soft); border-radius: 7px; padding: 1px; }
+.view-tog button { border: 0; background: none; font-size: 11px; padding: 2px 7px; border-radius: 6px; color: var(--muted); }
+.view-tog button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }

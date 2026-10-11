@@ -220,9 +220,17 @@
     for (const p of S.projects) groups.set(p.path, { name: p.name, path: p.path, items: [] });
     for (const s of items) { const k = s.cwd || '?'; if (!groups.has(k)) groups.set(k, { name: folderName(s.cwd), path: s.cwd || '', items: [] }); groups.get(k).items.push(s); }
     const arr = [...groups.values()].sort((a, b) => (latest(b) - latest(a)) || a.name.localeCompare(b.name));
-    section(tr('Sessions'), optionsButton());
+    // Two views of the Code sessions: grouped by project, or by date (Today, Yesterday…).
+    const view = store.get('sessionView') || 'project';
+    const tog = el('span', 'pills small view-tog');
+    for (const [v, label] of [['project', tr('Project')], ['date', tr('Date')]]) {
+      const b = el('button', view === v ? 'on' : null, label); b.onclick = (e) => { e.stopPropagation(); store.set('sessionView', v); renderList(); }; tog.appendChild(b);
+    }
+    const extra = el('span', 'sec-extra'); extra.append(tog, optionsButton());
+    section(tr('Sessions'), extra);
     if (S.selecting || S.suggesting) box.appendChild(selectBar());
-    if (!arr.length) { box.appendChild(el('div', 'empty-list', tr('Sessions you start will show up here'))); return; }
+    if (!items.length && (view === 'date' || !arr.length)) { box.appendChild(el('div', 'empty-list', tr('Sessions you start will show up here'))); return; }
+    if (view === 'date') { for (const [title, list] of byDate(items)) box.appendChild(group(title, list)); return; }
     for (const g of arr) box.appendChild(group(g.name, g.items, g.path));
   }
   function routineRow(r) {
