@@ -116,14 +116,28 @@
   $('mapClose').onclick = () => $('mapDlg').close();
   function renderUpdate() {
     const u = S.update || {}, b = $('updateBtn');
-    if (u.manual) { if (u.error) toast(tr('Could not check for updates: {e}', { e: u.error }), true); else if (!u.available) toast(tr('You have the latest version')); }
+    if (u.manual) { if (u.error) toast(tr('Could not check for updates: {e}', { e: u.error }), true); else showUpdateDlg(); }
     else if (u.failed) toast(tr('Update failed: {e}', { e: u.error }), true);
     b.hidden = !u.available; b.disabled = !!u.applying;
     const steps = { pull: tr('Pulling the latest version…'), install: tr('Installing dependencies…'), relaunch: tr('Relaunching…') };
     b.querySelector('span').textContent = u.applying ? steps[u.step] || tr('Updating…') : tr('Relaunch to update');
     b.title = u.available ? tr('{n} new commit(s)', { n: u.behind }) + (u.log?.length ? '\n' + u.log.join('\n') : '') : '';
   }
-  $('updateBtn').onclick = () => { try { sessionStorage.setItem('updating', '1'); } catch { /* ignore */ } S.update = { ...S.update, applying: true, step: 'pull' }; renderUpdate(); send({ type: 'updateApply' }); };
+  // Update popup: lists what changed since the running version; "Update now" pulls, installs and relaunches.
+  // With nothing new, the same popup offers to reinstall and relaunch anyway (a forced update).
+  function showUpdateDlg() {
+    const u = S.update || {}, list = $('updLog'); list.innerHTML = '';
+    $('updTitle').textContent = u.available ? tr('Update available') : tr('You have the latest version');
+    $('updSub').textContent = u.available ? tr('{n} change(s) since your version:', { n: u.behind }) : tr('Nothing new to download. You can still reinstall and relaunch the app.');
+    for (const l of u.log || []) list.appendChild(el('li', null, l));
+    $('updGo').textContent = u.available ? tr('Update now') : tr('Reinstall and relaunch');
+    if (!$('updDlg').open) $('updDlg').showModal();
+  }
+  $('updLater').onclick = () => $('updDlg').close();
+  $('updGo').onclick = () => { $('updDlg').close(); applyUpdateNow(); };
+  $('updCheckBtn').onclick = () => { toast(tr('Checking for updates…')); send({ type: 'updateCheck' }); };
+  function applyUpdateNow() { try { sessionStorage.setItem('updating', '1'); } catch { /* ignore */ } S.update = { ...S.update, applying: true, step: 'pull' }; renderUpdate(); send({ type: 'updateApply' }); }
+  $('updateBtn').onclick = showUpdateDlg;
   $('updateCheck').onclick = () => { toast(tr('Checking for updates…')); send({ type: 'updateCheck' }); };
   function renderAuth() {
     const a = S.auth || {}; const dot = $('authDot'), label = $('authLabel');

@@ -1673,7 +1673,7 @@ async function checkUpdate() {
   const n = await git(['rev-list', '--count', 'HEAD..@{u}']);
   update.behind = Number(n.stdout.trim()) || 0;
   update.available = update.behind > 0;
-  update.log = update.available ? (await git(['log', '--format=%s', '-n', '6', 'HEAD..@{u}'])).stdout.trim().split('\n').filter(Boolean) : [];
+  update.log = update.available ? (await git(['log', '--format=%s', '-n', '40', 'HEAD..@{u}'])).stdout.trim().split('\n').filter(Boolean) : [];
   update.checked = Date.now();
   broadcast({ type: 'update', ...update });
   return update;

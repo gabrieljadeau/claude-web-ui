@@ -97,7 +97,7 @@
       <svg class="chev"><use href="#i-chev"/></svg>
     </button>
     <button class="ib" id="reportBtn" title="Request a fix or a feature"><svg><use href="#i-life"/></svg></button>
-    <button class="ib" id="searchBtn" title="Search (⌘K)"><svg><use href="#i-search"/></svg></button><button class="ib" id="keysBtn" title="Keyboard shortcuts (?)" style="font-weight:600;font-size:14px">?</button>
+    <button class="ib" id="searchBtn" title="Search (⌘K)"><svg><use href="#i-search"/></svg></button><button class="ib" id="updCheckBtn" title="Check for updates"><svg><use href="#i-retry"/></svg></button><button class="ib" id="keysBtn" title="Keyboard shortcuts (?)" style="font-weight:600;font-size:14px">?</button>
   </div>
 </aside>
 
@@ -587,6 +587,13 @@
   <div class="dlg-head">Edit skill · <span id="skeName"></span></div>
   <div class="dlg-body form"><textarea id="skeText" rows="22" spellcheck="false" style="font-family:var(--mono,ui-monospace,monospace);font-size:12.5px"></textarea></div>
   <div class="dlg-foot"><button class="btn" id="skeClose">Cancel</button><button class="btn dark" id="skeSave">Save</button></div>
+</dialog>
+
+<!-- Update: what's new since this version, then update -->
+<dialog id="updDlg" style="width:min(520px,94vw)">
+  <div class="dlg-head" id="updTitle">Update available</div>
+  <div class="dlg-body"><p class="muted small" id="updSub"></p><ul id="updLog" class="upd-log"></ul></div>
+  <div class="dlg-foot"><button class="btn" id="updLater">Later</button><button class="btn dark" id="updGo">Update now</button></div>
 </dialog>
 
 <!-- Keyboard shortcuts -->
