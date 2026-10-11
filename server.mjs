@@ -746,6 +746,41 @@ async function sidebar() {
   out.sort((a, b) => b.when - a.when);
   return out;
 }
+// Artifacts: every file Claude wrote (Write / Edit / NotebookEdit) in any session, for the ⌘K palette. One pass per
+// transcript, cached by its last-modified time; live sessions are read from their items. Missing files are dropped.
+const artifactCache = new Map();   // sdkId -> { when, files: [{ path, action }] }
+const ARTIFACT_TOOLS = { Write: 'Created', Edit: 'Edited', MultiEdit: 'Edited', NotebookEdit: 'Edited' };
+function artifactsOfTools(tools) {
+  const files = new Map();
+  for (const t of tools) {
+    const act = ARTIFACT_TOOLS[t.name]; const p = t.input?.file_path || t.input?.notebook_path;
+    if (!act || typeof p !== 'string' || !path.isAbsolute(p)) continue;
+    files.set(p, files.get(p) === 'Created' ? 'Created' : act);
+  }
+  return [...files].map(([path, action]) => ({ path, action }));
+}
+async function artifacts() {
+  const out = [];
+  for (const s of await sidebar()) {
+    if (s.archived) continue;
+    let files;
+    const rt = runtimes.get(s.sid);
+    if (rt) files = artifactsOfTools(rt.items.filter((i) => i.type === 'tool'));
+    else {
+      const c = artifactCache.get(s.sid);
+      if (c && c.when === s.when) files = c.files;
+      else {
+        const msgs = await getSessionMessages(s.sid, s.cwd ? { dir: s.cwd } : undefined).catch(() => []);
+        const tools = [];
+        for (const m of msgs) { const c = m.message?.content; if (Array.isArray(c)) for (const b of c) if (b.type === 'tool_use') tools.push(b); }
+        files = artifactsOfTools(tools);
+        artifactCache.set(s.sid, { when: s.when, files });
+      }
+    }
+    for (const f of files) if (fs.existsSync(f.path)) out.push({ ...f, sid: s.sid, cwd: s.cwd, kind: s.kind, title: s.title, when: s.when });
+  }
+  return out;
+}
 function firstUserText(rt) { const u = rt.items.find((i) => i.type === 'user'); return u ? u.text.split('\n')[0].slice(0, 80) : ''; }
 
 let sidebarTimer = null;
@@ -1157,6 +1192,7 @@ wss.on('connection', async (ws) => {
           break;
         }
         case 'sessions': invalidateListing(); send({ type: 'sessions', items: await sidebar(), projects: projects() }); break;
+        case 'artifacts': send({ type: 'artifacts', items: await artifacts() }); break;
         case 'dashboard': send({ type: 'dashboard', usage: state.usage.slice(-3000), items: await sidebar(), routines: state.routines }); break;
 
         // ---- projects & folders

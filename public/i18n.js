@@ -531,6 +531,7 @@
     'Results': ['Résultats', 'Resultados', 'Risultati', 'Ergebnisse'],
     'Recents': ['Récents', 'Recientes', 'Recenti', 'Zuletzt'],
     'Projects and routines': ['Projets et routines', 'Proyectos y rutinas', 'Progetti e routine', 'Projekte und Routinen'],
+    'Artifacts': ['Artefacts', 'Artefactos', 'Artefatti', 'Artefakte'],
     'Actions': ['Actions', 'Acciones', 'Azioni', 'Aktionen'],
     'New chat': ['Nouveau chat', 'Nuevo chat', 'Nuova chat', 'Neuer Chat'],
     'New task': ['Nouvelle tâche', 'Nueva tarea', 'Nuova attività', 'Neue Aufgabe'],
