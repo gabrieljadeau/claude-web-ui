@@ -75,9 +75,11 @@
   // Quality order: the voice chosen in Settings, then the browser's online neural voices (Edge: "… Online (Natural)",
   // Chrome: "Google …"), then enhanced local voices, then anything in the language.
   const NATURAL = /online \(natural\)|\bnatural\b|\bneural\b|^google /i, ENHANCED = /enhanced|premium|siri/i;
+  const NOVELTY = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|kathy|fred|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;  // macOS novelty / toy voices
   function voiceScore(v, lang) {
     const base = (lang || '').slice(0, 2).toLowerCase(); const vl = (v.lang || '').toLowerCase();
     if (!vl.startsWith(base)) return -1;
+    if (NOVELTY.test(v.name)) return -1;
     let s = vl === lang.toLowerCase() ? 10 : 0;
     if (NATURAL.test(v.name)) s += 100; else if (ENHANCED.test(v.name)) s += 50; else if (!v.localService) s += 20;
     return s;
