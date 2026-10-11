@@ -361,6 +361,35 @@ function metaOf(sdkId) { return state.meta[sdkId] || {}; }
 function setLang(rt, lang) { if (!lang || rt.lang === lang) return; rt.lang = lang; if (rt.sdkId) setMeta(rt.sdkId, { lang }); }
 function setMeta(sdkId, patch) { state.meta[sdkId] = { ...metaOf(sdkId), ...patch }; saveState(); }
 
+// ---- connectors: the MCP servers a Chat may use (claude.ai connectors, user-level servers). Their tools are deferred behind
+// ToolSearch, so only their names cost tokens; the picker in the composer footer says which ones a chat may load at all.
+const DEFAULT_CONNECTORS = /\b(Gmail|Google Calendar|Google Drive)\b/i;   // the small set a new chat starts with (Settings can change it)
+const connectorPrefix = (name) => 'mcp__' + name.replace(/[^A-Za-z0-9_-]/g, '_');   // the tool-name prefix Claude Code gives a server
+const ownServer = (name) => !name || name === 'browser' || name.startsWith('plugin:');
+function knownConnectors() { return (state.connectors || []).filter((c) => !ownServer(c.name)); }
+// Learned from the init message of each turn: with `all`, the session saw every server, so the list is replaced; otherwise merged.
+function rememberConnectors(servers, all) {
+  const seen = (servers || []).filter((c) => c && !ownServer(c.name) && c.status !== 'needs-auth' && c.status !== 'failed').map((c) => ({ name: c.name, status: c.status || '' }));
+  if (!seen.length) return;
+  const next = all ? seen : [...knownConnectors().filter((c) => !seen.some((n) => n.name === c.name)), ...seen];
+  next.sort((a, b) => a.name.localeCompare(b.name));
+  if (JSON.stringify(next) !== JSON.stringify(state.connectors || [])) { state.connectors = next; saveState(); }
+}
+function defaultConnectors() {
+  const known = knownConnectors().map((c) => c.name);
+  return Array.isArray(state.settings.connectors) ? state.settings.connectors.filter((n) => known.includes(n)) : known.filter((n) => DEFAULT_CONNECTORS.test(n));
+}
+function effectiveConnectors(rt) { return Array.isArray(rt.connectors) ? rt.connectors : defaultConnectors(); }
+const cleanConnectors = (list) => list.filter((n) => typeof n === 'string' && n.length <= 120).slice(0, 80);
+// The list is empty until a chat has run once: a tiny init-only request fills it (aborted before the model is called).
+async function discoverConnectors() {
+  const ac = new AbortController();
+  try {
+    const q = query({ prompt: 'ready', options: { cwd: PROBE_DIR, tools: ['ToolSearch'], maxTurns: 1, model: 'haiku', permissionMode: 'default', abortController: ac, systemPrompt: 'Answer in one word.' } });
+    for await (const m of q) { if (m.type === 'system' && m.subtype === 'init') { rememberConnectors(m.mcp_servers, true); ac.abort(); break; } }
+  } catch { /* aborted on purpose */ }
+}
+
 // ---------------------------------------------------------------- 2. auth
 let auth = { checked: false, connected: null, provider: 'unknown', loggedIn: false, detail: '', cli: null };
 
@@ -422,6 +451,7 @@ function createRuntime({ kind, cwd, sdkId = null, title = '', items = [], mode, 
     effort: state.settings.effort || '',
     browser: state.settings.browser,
     shell: kind === 'chat' && cwd !== CHAT_DIR && !!state.settings.chatShell,   // Chat with a terminal: Bash allowed, every command approved by hand
+    connectors: null,             // Chat: names of the MCP servers this chat may use; null = the default set
     lastUuid: null,               // uuid of the last assistant message: the cut point used by edit / retry
     liveThinking: '',
     routineId,
@@ -535,16 +565,26 @@ function queryOptions(rt, ac) {
     permissionMode: rt.shell && (rt.mode === 'bypassPermissions' || rt.mode === 'auto') ? 'default' : rt.mode,
     model: rt.model || undefined,
     effort: rt.effort || (rt.voice ? 'low' : undefined),   // a spoken turn wants a quick short answer, not a long think
-    systemPrompt: { type: 'preset', preset: 'claude_code', append: append.join(' ') },
+    systemPrompt: { type: 'preset', preset: 'claude_code', append: '' },   // filled below, once every addition is known
     mcpServers: browser ? { browser: browserServer() } : {},
     canUseTool: makePermissionHandler(rt),
   };
   if (rt.mode === 'bypassPermissions' && !rt.shell) opts.allowDangerouslySkipPermissions = true;
-  if (kind === 'chat') opts.tools = rt.shell ? ['Read', 'WebFetch', 'WebSearch', 'Bash'] : ['Read', 'WebFetch', 'WebSearch'];
+  if (kind === 'chat') {
+    // ToolSearch keeps connector tools deferred (names only): without it every schema is sent on every call (~360k tokens).
+    opts.tools = ['Read', 'WebFetch', 'WebSearch', 'ToolSearch', ...(rt.shell ? ['Bash'] : [])];
+    const on = effectiveConnectors(rt);
+    const off = knownConnectors().map((c) => c.name).filter((n) => !on.includes(n));
+    if (off.length) opts.disallowedTools = off.map(connectorPrefix);
+    rt.allConnectors = !off.length;
+    if (on.length) append.push(`Connectors available in this chat: ${on.map((n) => n.replace(/^claude\.ai /, '')).join(', ')}. Their tools are deferred: load one with ToolSearch before calling it. Other connectors are switched off for this chat.`);
+    else if (knownConnectors().length) append.push('No connectors are enabled in this chat; do not look for Gmail, calendar or other connector tools.');
+  }
   // Claude Code lets "safe" read-only commands (ls, cat, wc…) through without asking; in a Chat with a terminal every
   // command outside our own whitelist must reach the approval card, so a hook forces the question before its own rules.
   if (rt.shell) opts.hooks = { PreToolUse: [{ matcher: 'Bash', hooks: [async (h) => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: safeShellCommand(h.tool_input?.command) ? 'allow' : 'ask', permissionDecisionReason: 'Chat terminal: the user approves each command.' } })] }] };
   if (rt.title && !rt.sdkId) opts.title = rt.title;
+  opts.systemPrompt.append = append.join(' ');
   return opts;
 }
 
@@ -618,10 +658,11 @@ function handleSdkMessage(rt, m) {
     return;
   }
   if (m.type === 'system' && m.subtype === 'init') {
+    if (rt.kind === 'chat') { const before = JSON.stringify(state.connectors || []); rememberConnectors(m.mcp_servers, rt.allConnectors); if (before !== JSON.stringify(state.connectors)) broadcast({ type: 'info', info: sessionInfo(rt) }); }   // the first chat learns the list: its chip updates
     if (m.session_id && m.session_id !== rt.sdkId) {
       rt.sdkId = m.session_id;
       bySdk.set(rt.sdkId, rt);
-      setMeta(rt.sdkId, { kind: rt.kind, routineId: rt.routineId || undefined, lang: rt.lang || undefined });
+      setMeta(rt.sdkId, { kind: rt.kind, routineId: rt.routineId || undefined, lang: rt.lang || undefined, connectors: rt.connectors || undefined });
       broadcast({ type: 'sdkId', sid: rt.localId, sdkId: rt.sdkId });
       sidebarDirty();
     }
@@ -733,6 +774,7 @@ async function openFromDisk(sdkId, cwd) {
   const { items, lastUuid } = simplifyHistory(msgs);
   const rt = createRuntime({ kind, cwd: dir || os.homedir(), sdkId, title: info?.customTitle || info?.summary || '', items, routineId: meta.routineId || null });
   rt.lastUuid = lastUuid; rt.lang = meta.lang || '';
+  rt.connectors = Array.isArray(meta.connectors) ? cleanConnectors(meta.connectors) : null;
   return rt;
 }
 
@@ -1175,7 +1217,8 @@ server.on('upgrade', (req, socket, head) => {
 function sessionInfo(rt) {
   const meta = rt.sdkId ? metaOf(rt.sdkId) : {};
   return { sid: rt.localId, sdkId: rt.sdkId, kind: rt.kind, cwd: rt.cwd, title: rt.title || firstUserText(rt), status: rt.status, mode: rt.mode, model: rt.model,
-    browser: rt.browser, shell: rt.shell, effort: rt.effort, cost: rt.cost, context: rt.context, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId };
+    browser: rt.browser, shell: rt.shell, effort: rt.effort, cost: rt.cost, context: rt.context, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId,
+    connectors: rt.kind === 'chat' ? effectiveConnectors(rt) : undefined };
 }
 
 wss.on('connection', async (ws) => {
@@ -1277,6 +1320,7 @@ wss.on('connection', async (ws) => {
           if (typeof msg.model === 'string') rt.model = msg.model.trim().slice(0, 200);
           if (EFFORTS.includes(msg.effort)) rt.effort = msg.effort;
           if (typeof msg.browser === 'boolean') rt.browser = msg.browser;
+          if (Array.isArray(msg.connectors) || msg.connectors === null) { rt.connectors = msg.connectors && cleanConnectors(msg.connectors); if (rt.sdkId) setMeta(rt.sdkId, { connectors: rt.connectors || undefined }); }
           send({ type: 'info', info: sessionInfo(rt) });
           break;
         }
@@ -1399,6 +1443,11 @@ wss.on('connection', async (ws) => {
           break;
         }
         case 'mcp': send({ type: 'mcp', items: await listMcp() }); break;
+        case 'connectors': {
+          if (!knownConnectors().length) await discoverConnectors();
+          send({ type: 'connectors', items: knownConnectors(), defaults: defaultConnectors() });
+          break;
+        }
         case 'mcpAdd': {
           try { await mcpAdd(msg); send({ type: 'toast', text: `Connector “${msg.name}” added. Applies to new sessions.` }); }
           catch (err) { send({ type: 'error', message: String(err.message || err) }); }
@@ -1419,6 +1468,7 @@ wss.on('connection', async (ws) => {
           if (typeof msg.model === 'string') s.model = msg.model.trim().slice(0, 200);
           if (typeof msg.browser === 'boolean') s.browser = msg.browser;
           if (typeof msg.chatShell === 'boolean') s.chatShell = msg.chatShell;
+          if (Array.isArray(msg.connectors)) s.connectors = cleanConnectors(msg.connectors);
           if (typeof msg.lang === 'string') s.lang = msg.lang.slice(0, 10);
           if (typeof msg.name === 'string') s.name = msg.name.trim().slice(0, 60);
           if (EFFORTS.includes(msg.effort)) s.effort = msg.effort;
