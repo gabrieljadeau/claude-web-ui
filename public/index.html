@@ -100,14 +100,11 @@
   <section id="viewSession" class="view" hidden>
     <header class="s-head">
       <span class="kind" id="sKind">Code</span>
-      <div class="s-title-wrap"><input id="sTitle" class="s-title" placeholder="Untitled" spellcheck="false"><div class="s-path" id="sPath"></div></div>
-      <span class="s-status" id="sStatus"></span>
-      <span class="ctx" id="sCtx" title="Context window used" hidden><span class="bar"><i></i></span><span class="pct"></span></span>
-      <span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span>
-      <button class="ib" id="sPin" title="Pin"><svg><use href="#i-pin"/></svg></button>
-      <button class="ib" id="sMore" title="More"><svg><use href="#i-more"/></svg></button>
+      <div class="s-title-wrap"><input id="sTitle" class="s-title" placeholder="Untitled" spellcheck="false"><span class="s-path" id="sPath" hidden><svg><use href="#i-folder"/></svg><span></span></span></div>
       <button class="ib" id="browserBtn" title="Browser view (what Claude sees)"><svg><use href="#i-globe"/></svg></button>
+      <button class="ib" id="sPin" title="Pin"><svg><use href="#i-pin"/></svg></button>
       <button class="ib" id="panelBtn" title="Progress panel"><svg><use href="#i-panel" style="transform:scale(-1,1);transform-origin:center"/></svg></button>
+      <button class="ib" id="sMore" title="More"><svg><use href="#i-more"/></svg></button>
     </header>
     <div class="s-body">
       <div class="s-col">
@@ -130,6 +127,7 @@
         <div class="sec"><div class="sec-t">Outputs <span class="sub" id="outCount"></span></div><div id="outputs"></div></div>
         <div class="sec"><div class="sec-t">Steps <span class="sub" id="stepCount"></span></div><div class="acts" id="acts"></div></div>
         <div class="sec"><div class="sec-t">Used in this chat</div><div class="used" id="used"></div></div>
+        <div class="sec" id="usageSec" hidden><div class="sec-t">Usage</div><div class="usage-row"><span class="ctx" id="sCtx" title="Context window used" hidden><span class="bar"><i></i></span><span class="pct"></span></span><span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span></div></div>
       </aside>
     </div>
   </section>

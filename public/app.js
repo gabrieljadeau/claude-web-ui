@@ -60,7 +60,7 @@
       case 'auth': S.auth = m.auth; renderAuth(); break;
       case 'authTest': toast(m.ok ? `Connection works. Claude replied: "${m.reply}"` : `Request failed: ${m.message}`, !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); break;
-      case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); } break;
+      case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncBrowserView(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
       case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? 'Waiting for your approval' : null); } if (m.status === 'idle') flushQueue(m.sid); break;
       case 'ev': if (S.info && m.sid === S.info.sid) renderEvent(m.ev); else if (m.ev.type === 'done' && m.ev.ok === false && m.ev.message) toast(m.ev.message, true); else if (m.ev.type === 'permission') toast('A chat needs your approval. See the sidebar or the Dashboard.', false, 5000); break;
@@ -72,8 +72,8 @@
       case 'plugins': S.plugins = m; renderPlugins(); break;
       case 'dashboard': S.dash = m; if (S.view === 'dashboard') renderDashboard(); break;
       case 'reported': onReported(m); break;
-      case 'browserFrame': showBrowserFrame('data:image/jpeg;base64,' + m.data, m.title || m.url); break;
-      case 'browserState': if (m.frame) showBrowserFrame('data:image/jpeg;base64,' + m.frame, m.page?.title); $('browserNote').textContent = m.live ? (m.page ? '' : 'Claude has no page open yet.') : 'Could not open a browser with a live view. Screenshots Claude takes will still appear here.'; if (m.page) $('browserTitle').textContent = m.page.title || m.page.url || ''; break;
+      case 'browserFrame': if (!isBlankUrl(m.url)) showBrowserFrame('data:image/jpeg;base64,' + m.data, m.title || m.url); break;
+      case 'browserState': browserState(m); break;
       case 'toast': toast(m.text); break;
       case 'error': toast(m.message, true); break;
     }
@@ -287,19 +287,20 @@
     renderSessionHead(); renderList(); renderPanel();
     sessionComposer.setBusy(info.status !== 'idle');
     if (info.status !== 'idle') showWorking(info.status === 'waiting' ? 'Waiting for your approval' : null);
-    editing = null; $('editHint').hidden = true; renderQueue(); if (browserWatching) setBrowserView(false); $('browserSec').hidden = true; $('browserView').classList.remove('has'); $('browserImg').src = ''; browserFrameSrc = '';
+    editing = null; $('editHint').hidden = true; renderQueue(); resetBrowserView(); syncBrowserView();
     scrollDown(true); sessionComposer.focus();
     if (pendingFirst) { const m = pendingFirst; pendingFirst = null; send({ type: 'send', sid: info.sid, text: m.text, files: m.files }); }
   }
   function renderSessionHead() {
     const i = S.info; if (!i) return;
     $('sKind').textContent = KIND_LABEL[i.kind]; $('sKind').className = 'kind ' + i.kind;
-    if (document.activeElement !== $('sTitle')) $('sTitle').value = i.title || '';
-    $('sPath').textContent = i.kind === 'chat' ? '' : shortPath(i.cwd);
-    const st = $('sStatus'); st.className = 's-status ' + i.status;
-    st.textContent = i.status === 'running' ? 'Working…' : i.status === 'waiting' ? 'Needs your approval' : '';
+    const t = $('sTitle'); if (document.activeElement !== t) t.value = i.title || '';
+    t.style.width = Math.min(80, Math.max(10, (t.value || t.placeholder).length + 3)) + 'ch';
+    // The folder as a chip next to the title (full path on hover); nothing for Chat, which has no folder.
+    const p = $('sPath'), showPath = i.kind !== 'chat' && !!i.cwd; p.hidden = !showPath;
+    if (showPath) { p.querySelector('span').textContent = i.cwd === S.home ? 'Home folder' : (i.cwd.split(/[\\/]/).filter(Boolean).pop() || i.cwd); p.title = shortPath(i.cwd); }
     $('sCost').textContent = i.cost ? `~$${i.cost.toFixed(i.cost < 0.1 ? 3 : 2)} spent` : '';
-    renderCtx($('sCtx'), i.context);
+    renderCtx($('sCtx'), i.context); syncUsage();
     $('sModelChip').querySelector('span').textContent = modelLabel(i.model);
     $('sEffortChip').querySelector('span').textContent = EFFORT_LABEL[i.effort || ''];
     $('sModeChip').querySelector('span').textContent = MODE_SHORT[i.mode] || i.mode; $('sModeChip').hidden = i.kind === 'chat';
@@ -314,6 +315,7 @@
     node.querySelector('i').style.width = pct + '%'; node.querySelector('.pct').textContent = `Context ${pct}%`;
     node.title = `Context window: ${fmtK(ctx.used)} of ${fmtK(ctx.window)} tokens used`;
   }
+  function syncUsage() { $('usageSec').hidden = $('sCtx').hidden && !$('sCost').textContent; }
   $('sTitle').onchange = () => { const t = $('sTitle').value.trim(); if (t && S.info) { S.info.title = t; send({ type: 'rename', sid: S.sid, title: t }); } };
   $('sTitle').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sTitle').blur(); } };
   $('sModelChip').onclick = (e) => modelMenu(e, (v) => send({ type: 'sessionSettings', sid: S.sid, model: v }));
@@ -431,7 +433,7 @@
   let workTimer = null;
   function showWorking(label) {
     if (!V) return;
-    if (!V.working) { V.working = el('div', 'working'); V.working.innerHTML = '<span class="dots"><i></i><i></i><i></i></span><span class="lbl"></span><span class="t"></span>'; V.workStart = Date.now(); clearInterval(workTimer); workTimer = setInterval(() => { if (V?.working) V.working.querySelector('.t').textContent = fmtDur(Math.round((Date.now() - V.workStart) / 1000)); }, 1000); }
+    if (!V.working) { V.working = el('div', 'working'); V.working.innerHTML = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="lbl"></span><span class="t"></span>'; V.workStart = Date.now(); clearInterval(workTimer); workTimer = setInterval(() => { if (V?.working) V.working.querySelector('.t').textContent = fmtDur(Math.round((Date.now() - V.workStart) / 1000)); }, 1000); }
     if (label) V.current = label;
     V.working.querySelector('.lbl').textContent = V.current || 'Working';
     keepWorkingLast(); scrollDown(); renderPanelLight();
@@ -584,6 +586,7 @@
     }
     if (m.context && S.info) { S.info.context = m.context; renderCtx($('sCtx'), m.context); }
     if (!replay && m.cost && S.info) { S.info.cost = (S.info.cost || 0) + m.cost; $('sCost').textContent = `~$${S.info.cost.toFixed(S.info.cost < 0.1 ? 3 : 2)} spent`; }
+    if (m.context || m.cost) syncUsage();
     if (!replay && store.get('speak', false) && V.lastText) speak(V.lastText);
     V.group = null; V.turn = null; V.reply = null;
     renderPanelLight();
@@ -647,20 +650,39 @@
     if (s.images?.length && !row.querySelector(':scope > .detail > img')) for (const p of s.images) { const im = el('img'); im.src = fileUrl(p); im.onclick = () => openPreview(p); row.querySelector('.detail').appendChild(im); }
   }
 
-  // browser view (live screencast of the browser Claude drives, or its latest screenshot)
-  let browserWatching = false, browserFrameSrc = '';
-  function setBrowserView(on) {
+  // browser view (live screencast of the browser Claude drives, or its latest screenshot).
+  // Shown by default in Cowork and Code sessions that have the browser on ("lazy": the browser itself is
+  // only launched when Claude first uses it); the globe button hides it again for this session.
+  let browserWatching = false, browserFrameSrc = '', browserFrameShot = false, browserHidden = false;
+  const isBlankUrl = (u) => !u || /^about:blank/.test(u);
+  function resetBrowserView() { if (browserWatching) send({ type: 'browserWatch', on: false }); browserWatching = false; browserHidden = false; $('browserSec').hidden = true; $('browserBtn').classList.remove('on'); clearBrowserFrame(); $('browserNote').textContent = 'Opening the browser…'; }
+  function clearBrowserFrame() { $('browserView').classList.remove('has'); $('browserImg').src = ''; browserFrameSrc = ''; browserFrameShot = false; $('browserTitle').textContent = ''; }
+  function syncBrowserView() {
+    const i = S.info; if (!i) return;
+    const want = !!i.browser && i.kind !== 'chat' && !browserHidden;
+    if (want && !browserWatching) setBrowserView(true, { lazy: true });
+    else if (!i.browser && browserWatching) setBrowserView(false);
+  }
+  function browserState(m) {
+    const blank = !m.page || isBlankUrl(m.page.url);
+    if (m.frame && !blank) showBrowserFrame('data:image/jpeg;base64,' + m.frame, m.page?.title);
+    else if (blank && !browserFrameShot) clearBrowserFrame();
+    $('browserNote').textContent = m.live ? (blank ? 'Claude has not opened a page yet. It appears here as soon as it does.' : '') : m.lazy ? 'The browser opens here as soon as Claude uses it.' : 'Could not open a browser with a live view. Screenshots Claude takes will still appear here.';
+    if (!blank) $('browserTitle').textContent = m.page.title || m.page.url || '';
+  }
+  function setBrowserView(on, { lazy = false, user = false } = {}) {
     browserWatching = on; $('browserSec').hidden = !on; $('browserBtn').classList.toggle('on', on);
+    if (user) browserHidden = !on;
     document.body.classList.toggle('panel-wide', on);
-    if (on) { openPanel(true); send({ type: 'browserWatch', on: true }); } else send({ type: 'browserWatch', on: false });
+    if (on) { if (!lazy) openPanel(true); send({ type: 'browserWatch', on: true, lazy }); } else send({ type: 'browserWatch', on: false });
   }
   function showBrowserFrame(src, title, isShot) {
-    browserFrameSrc = src; const img = $('browserImg'); img.src = src; $('browserView').classList.add('has');
+    browserFrameSrc = src; browserFrameShot = !!isShot; const img = $('browserImg'); img.src = src; $('browserView').classList.add('has');
     if (title) $('browserTitle').textContent = title;
     if (isShot && !browserWatching) { $('browserSec').hidden = false; openPanel(true); }
   }
-  $('browserBtn').onclick = () => setBrowserView(!browserWatching);
-  $('browserClose').onclick = () => setBrowserView(false);
+  $('browserBtn').onclick = () => setBrowserView(!browserWatching, { user: true });
+  $('browserClose').onclick = () => setBrowserView(false, { user: true });
   $('browserView').onclick = () => { if (!browserFrameSrc) return; const body = $('previewBody'); body.innerHTML = ''; const im = el('img'); im.src = browserFrameSrc; body.appendChild(im); $('previewName').textContent = $('browserTitle').textContent || 'Browser'; $('previewOpen').href = browserFrameSrc; previewPath = null; $('preview').hidden = false; };
 
   // file preview

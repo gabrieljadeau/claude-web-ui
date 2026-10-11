@@ -59,7 +59,7 @@ const PROMPTS = {
   cowork: 'This is a "Cowork" task: the user gave you a folder to work in autonomously. Plan briefly, do the work, save results as files in that folder, and finish with a short summary of what you produced and where.',
   code: 'This is a "Code" session in a project folder, like the claude terminal command.',
   routine: 'This is a scheduled routine running without anyone watching. Do the task completely, do not ask questions, and finish with a concise report of what you did.',
-  browser: 'When the user asks you to visit websites or act in a web page, use the browser tools (their names start with mcp__browser__).',
+  browser: 'You have a real web browser: the tools whose names start with mcp__browser__ (if they are listed as deferred, load them with ToolSearch first). The user watches that browser live in a panel next to the chat, so when you look something up on the web (a site, the weather, prices, news, documentation) prefer the browser tools over curl or WebFetch, so they can follow along. WebSearch is fine for finding where to look.',
 };
 
 // Playwright's MCP server lets Claude drive a browser (navigate, click, type, read pages).
@@ -86,13 +86,18 @@ function findBrowserExe() {
   else c.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/microsoft-edge');
   return c.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
 }
-function httpJson(url, timeout = 1500) {
+function httpJson(url, timeout = 1500, method = 'GET') {
   return new Promise((resolve) => {
-    const req = http.get(url, { timeout }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(null); } }); });
-    req.on('error', () => resolve(null)); req.on('timeout', () => { req.destroy(); resolve(null); });
+    const req = http.request(url, { method, timeout }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(null); } }); });
+    req.on('error', () => resolve(null)); req.on('timeout', () => { req.destroy(); resolve(null); }); req.end();
   });
 }
 async function ensureLiveBrowser() {
+  const ok = await launchLiveBrowser();
+  if (ok && liveBrowser.watchers) startScreencast(); // someone is already looking at the Browser panel
+  return ok;
+}
+async function launchLiveBrowser() {
   if (await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)) { liveBrowser.ready = true; return true; }
   const exe = findBrowserExe();
   if (!exe) { liveBrowser.ready = false; return false; }
@@ -109,7 +114,12 @@ async function screencastTick() {
   if (!liveBrowser.watchers) { stopScreencast(); return; }
   const list = await httpJson(`http://127.0.0.1:${CDP_PORT}/json/list`);
   const page = (list || []).find((t) => t.type === 'page' && !/^(devtools|chrome):/.test(t.url || ''));
-  if (!page) { if (liveBrowser.cdp) { liveBrowser.cdp.close(); liveBrowser.cdp = null; liveBrowser.target = null; } broadcast({ type: 'browserState', live: liveBrowser.ready, page: null }); return; }
+  if (!page) {
+    if (liveBrowser.cdp) { liveBrowser.cdp.close(); liveBrowser.cdp = null; liveBrowser.target = null; }
+    // Chrome may be running with no tab at all (Playwright closes its pages when a turn ends): open a blank one so there is something to stream.
+    if (list && Date.now() - (liveBrowser.lastNew || 0) > 10000) { liveBrowser.lastNew = Date.now(); await httpJson(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, 1500, 'PUT'); }
+    broadcast({ type: 'browserState', live: liveBrowser.ready, page: null }); return;
+  }
   if (liveBrowser.target === page.id && liveBrowser.cdp?.readyState === 1) { broadcast({ type: 'browserState', live: true, page: { url: page.url, title: page.title } }); return; }
   if (liveBrowser.cdp) liveBrowser.cdp.close();
   liveBrowser.target = page.id;
@@ -1072,7 +1082,8 @@ wss.on('connection', async (ws) => {
         case 'browserWatch': {
           const was = ws.watching; ws.watching = !!msg.on;
           liveBrowser.watchers += (ws.watching ? 1 : 0) - (was ? 1 : 0);
-          if (ws.watching) { if (!liveBrowser.ready) await ensureLiveBrowser(); send({ type: 'browserState', live: liveBrowser.ready, page: null, frame: liveBrowser.lastFrame }); if (liveBrowser.ready) startScreencast(); }
+          // "lazy": show the panel without launching a browser; it starts streaming once Claude's next turn opens one.
+          if (ws.watching) { if (!liveBrowser.ready && !msg.lazy) await ensureLiveBrowser(); if (!liveBrowser.ready && msg.lazy) liveBrowser.ready = !!(await httpJson(`http://127.0.0.1:${CDP_PORT}/json/version`)); send({ type: 'browserState', live: liveBrowser.ready, lazy: !!msg.lazy, page: null, frame: liveBrowser.lastFrame }); if (liveBrowser.ready) startScreencast(); }
           else if (liveBrowser.watchers <= 0) { liveBrowser.watchers = 0; stopScreencast(); }
           break;
         }
