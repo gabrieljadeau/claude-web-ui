@@ -344,7 +344,7 @@ function termKill(rt) { const t = rt.term; if (!t?.proc) return; rt.term = null;
 // ------------------------------------------------------- persistent state
 const state = loadState();
 function loadState() {
-  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'default', coworkMode: 'auto', browser: true, chatShell: false, lang: 'fr-FR', repo: '', githubToken: '' } };
+  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'auto', coworkMode: 'auto', browser: true, chatShell: false, lang: 'fr-FR', repo: '', githubToken: '' } };
   try {
     const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     const st = { ...def, ...s, settings: { ...def.settings, ...(s.settings || {}) } };
@@ -558,6 +558,8 @@ function queryOptions(rt, ac) {
   if (browser) append.push(PROMPTS.browser);
   if (rt.lang) append.push(`The user's language in this conversation is ${LANG_NAMES[rt.lang.slice(0, 2)] || rt.lang}: every reply, spoken or written, is in that language unless the user clearly switches to another one.`);
   if (rt.voice) { append.push(PROMPTS.voice); if (rt.voiceLang) append.push(`REQUIRED: the very first characters of your reply must be a tag of the form [lang:xx-XX] (for example [lang:es-ES]) naming the language the user actually spoke, one of fr-FR, es-ES, en-US, it-IT, de-DE. The interface removes this tag before the reply is shown or read aloud and uses it to switch the microphone and the voice. The speech recognizer was set to ${rt.voiceLang}; if the words read like another language transcribed wrongly, the user probably spoke that one; keep ${rt.voiceLang} only when unsure or when the words are too short to tell. Answer in the language of the tag.`); }
+  // New conversations default to auto mode: say so once, so the user can switch if they want approvals.
+  if (!rt.sdkId && rt.mode === 'auto' && !rt.shell) append.push('This conversation runs in auto permission mode (actions run without asking for approval). In your first reply, in the user\'s language, add one short line saying so and that they can change the mode at the bottom right, just below the plus button.');
   const opts = {
     cwd: rt.cwd,
     resume: rt.sdkId || undefined,

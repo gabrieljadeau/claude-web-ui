@@ -394,7 +394,7 @@
     $('modelChipText').textContent = modelLabel(S.newModel ?? S.settings.model ?? '');
     $('effortChipText').textContent = effortShort(S.newEffort ?? S.settings.effort ?? '');
     $('modeChip').hidden = S.tab !== 'code';
-    $('modeChipText').textContent = MODE_SHORT[S.newMode || S.settings.mode || 'default'] || S.newMode || S.settings.mode;
+    $('modeChipText').textContent = MODE_SHORT[S.newMode || S.settings.mode || 'auto'] || S.newMode || S.settings.mode;
   }
   $('modeChip').onclick = (e) => menu(e, Object.entries(MODE_LABEL).map(([v, l]) => [l, () => { S.newMode = v; renderWelcomeChips(); }]), tr('Permissions'));
   const effortShort = (v) => ({ '': tr('Default'), low: tr('Low'), medium: tr('Medium'), high: tr('High'), xhigh: tr('Very high'), max: tr('Max') }[v] || v);
@@ -1878,7 +1878,7 @@
     const s = S.settings || {};
     fillModelSelect($('setModel'), s.model || '');
     $('setEffort').value = s.effort || '';
-    $('setMode').value = s.mode || 'default'; $('setCoworkMode').value = s.coworkMode || 'auto';
+    $('setMode').value = s.mode || 'auto'; $('setCoworkMode').value = s.coworkMode || 'auto';
     $('setBrowser').checked = s.browser !== false; $('setChatShell').checked = !!s.chatShell; $('setLang').value = s.lang || 'fr-FR'; $('setUiLang').value = store.get('uiLang', 'auto');
     $('setSpeak').checked = store.get('speak', false); $('setHandsFree').checked = store.get('handsFree', false); $('setArchived').checked = S.showArchived;
     if (document.activeElement !== $('setName')) $('setName').value = s.name || S.user || '';
