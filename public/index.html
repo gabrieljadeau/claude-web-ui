@@ -31,6 +31,16 @@
   <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 01-12 0zM12 18v3"/></symbol>
   <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M10 4a2 2 0 114 0v2h4v4h-2a2 2 0 100 4h2v4h-4v-2a2 2 0 10-4 0v2H6v-4h2a2 2 0 100-4H6V6h4z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5h10"/></symbol>
+  <symbol id="i-retry" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.7L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.7L4 16M4 20v-4h4"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></symbol>
+  <symbol id="i-life" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M18.4 5.6l-3.5 3.5M9.1 14.9l-3.5 3.5"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="9" r="2.2"/><path d="M6 7.2v9.6M18 11.2c0 3-3 4-6 4.4-2.5.3-5 1-6 3"/></symbol>
+  <symbol id="i-thumbup" viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V10H19a2 2 0 012 2l-1.5 6a2 2 0 01-2 1.5H7"/></symbol>
+  <symbol id="i-thumbdown" viewBox="0 0 24 24"><path d="M17 13V4h3v9zM17 13l-4 7c-1.5 0-2.5-1-2.5-2.5V14H5a2 2 0 01-2-2l1.5-6A2 2 0 016.5 4.5H17"/></symbol>
   <symbol id="i-attach" viewBox="0 0 24 24"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5"/></symbol>
 </svg>
 
@@ -47,6 +57,7 @@
   <button class="sb-search" id="searchBtn"><svg><use href="#i-search"/></svg><span>Search</span><kbd>⌘K</kbd></button>
   <nav class="sb-nav">
     <button id="newBtn"><svg><use href="#i-plus"/></svg><span id="newLabel">New</span></button>
+    <button id="navDashboard"><svg><use href="#i-dash"/></svg><span>Dashboard</span></button>
     <button id="navProjects"><svg><use href="#i-folder"/></svg><span>Projects</span></button>
     <button id="navRoutines"><svg><use href="#i-clock"/></svg><span>Routines</span></button>
     <button id="navCustomize"><svg><use href="#i-box"/></svg><span>Customize</span></button>
@@ -59,6 +70,7 @@
       <span class="u-text"><span id="userName">…</span><small id="authLabel">Checking connection…</small></span>
       <span class="dot" id="authDot"></span>
     </button>
+    <button class="ib" id="reportBtn" title="Request a fix or a feature"><svg><use href="#i-life"/></svg></button>
     <button class="ib" id="settingsBtn" title="Settings"><svg><use href="#i-gear"/></svg></button>
   </div>
 </aside>
@@ -71,11 +83,11 @@
     <div class="welcome">
       <h1><svg class="star"><use href="#i-star"/></svg><span id="welcomeTitle">Welcome</span></h1>
       <div class="composer-box" id="welcomeComposer"></div>
-      <div class="under">
+      <div hidden id="welcomeChips">
         <button class="chip" id="projectChip"><svg><use href="#i-folder"/></svg><span id="projectChipText">Project</span><svg><use href="#i-chev"/></svg></button>
-        <span class="spacer"></span>
-        <button class="chip ghost" id="modelChip"><span id="modelChipText">Default model</span></button>
         <button class="chip ghost" id="modeChip"><span id="modeChipText">Ask</span></button>
+        <button class="chip ghost" id="modelChip"><span id="modelChipText">Default model</span></button>
+        <button class="chip ghost" id="effortChip"><span id="effortChipText">Default effort</span></button>
       </div>
       <div class="jump" id="jump"></div>
     </div>
@@ -87,16 +99,50 @@
       <span class="kind" id="sKind">Code</span>
       <div class="s-title-wrap"><input id="sTitle" class="s-title" placeholder="Untitled" spellcheck="false"><div class="s-path" id="sPath"></div></div>
       <span class="s-status" id="sStatus"></span>
-      <select id="sModel" title="Model"></select>
-      <select id="sMode" title="Permissions">
-        <option value="default">Ask before changes</option><option value="acceptEdits">Auto-accept edits</option><option value="bypassPermissions">Autonomous</option><option value="plan">Plan only</option>
-      </select>
-      <label class="chk" id="sBrowserWrap" title="Let Claude open and use the web browser"><input type="checkbox" id="sBrowser"> Browser</label>
+      <span class="ctx" id="sCtx" title="Context window used" hidden><span class="bar"><i></i></span><span class="pct"></span></span>
+      <span class="s-cost" id="sCost" title="Estimated spend in this session (sum of the turns, as reported by Claude Code)"></span>
       <button class="ib" id="sPin" title="Pin"><svg><use href="#i-pin"/></svg></button>
       <button class="ib" id="sMore" title="More"><svg><use href="#i-more"/></svg></button>
+      <button class="ib" id="panelBtn" title="Progress panel"><svg><use href="#i-panel" style="transform:scale(-1,1);transform-origin:center"/></svg></button>
     </header>
-    <div id="chat"><div class="wrap" id="log"></div></div>
-    <div class="composer"><div class="wrap"><div class="composer-box" id="sessionComposer"></div></div></div>
+    <div class="s-body">
+      <div class="s-col">
+        <div id="chat"><div class="wrap" id="log"></div><button class="jump-btn" id="jumpBtn" hidden>Jump to bottom ↓</button></div>
+        <div class="composer"><div class="wrap">
+          <div class="queue" id="queue"></div>
+          <div class="edit-hint" id="editHint" hidden><span></span><button class="btn link">Cancel (Esc)</button></div>
+          <div class="composer-box" id="sessionComposer"></div>
+          <div hidden id="sessionChips">
+            <button class="chip ghost" id="sModeChip"><span></span></button>
+            <button class="chip ghost" id="sBrowserChip"><span></span></button>
+            <button class="chip ghost" id="sModelChip"><span></span></button>
+            <button class="chip ghost" id="sEffortChip"><span></span></button>
+          </div></div></div>
+      </div>
+      <aside class="panel-side" id="panel">
+        <div class="sec"><div class="sec-t">Progress <span class="sub" id="progressLabel"></span></div><div id="progressBody"></div></div>
+        <div class="sec"><div class="sec-t">Outputs <span class="sub" id="outCount"></span></div><div id="outputs"></div></div>
+        <div class="sec"><div class="sec-t">Steps <span class="sub" id="stepCount"></span></div><div class="acts" id="acts"></div></div>
+        <div class="sec"><div class="sec-t">Used in this chat</div><div class="used" id="used"></div></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="viewDashboard" class="view page" hidden>
+    <div class="page-in">
+      <div class="page-head"><h1>Dashboard</h1><span class="spacer"></span><span class="muted small" id="dashNote"></span></div>
+      <div class="stats" id="dashStats"></div>
+      <div class="cards">
+        <div class="card"><div class="card-t">Needs your approval</div><div id="dashPending"></div></div>
+        <div class="card"><div class="card-t">Working now</div><div id="dashRunning"></div></div>
+        <div class="card wide"><div class="card-t">Spend, last 14 days</div><div class="bars" id="dashBars"></div></div>
+        <div class="card"><div class="card-t">By model</div><div id="dashModels"></div></div>
+        <div class="card"><div class="card-t">By type</div><div id="dashKinds"></div></div>
+        <div class="card wide"><div class="card-t">Context use, recent sessions</div><div id="dashContext"></div></div>
+        <div class="card wide"><div class="card-t">Routines</div><div id="dashRoutines"></div></div>
+      </div>
+    </div>
   </section>
 
   <!-- Projects -->
@@ -211,7 +257,12 @@
 
 <!-- Search palette -->
 <div id="search" class="overlay top" hidden>
-  <div class="panel narrow"><input id="searchInput" placeholder="Search chats, projects, routines, skills…" autocomplete="off"><div id="searchResults"></div></div>
+  <div class="panel narrow">
+    <div class="search-top"><svg class="sicon"><use href="#i-search"/></svg><input id="searchInput" placeholder="Search" autocomplete="off"><button class="ib" id="searchClose" title="Close">✕</button></div>
+    <div class="pills small" id="searchFilters"><button data-f="all" class="active">All</button><button data-f="chat">Chat</button><button data-f="cowork">Cowork</button><button data-f="code">Code</button><button data-f="projects">Projects</button><button data-f="routines">Routines</button></div>
+    <div id="searchResults"></div>
+    <div class="search-foot"><span><kbd>Esc</kbd> Close</span><span><kbd>←</kbd><kbd>→</kbd> Change type</span><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>↵</kbd> Open</span><span class="spacer"></span><span><kbd>/</kbd> or <kbd>⌘K</kbd> anywhere</span></div>
+  </div>
 </div>
 
 <!-- Settings -->
@@ -222,6 +273,7 @@
     <button data-p="connection">Connection</button>
     <button data-p="code">Claude Code</button>
     <button data-p="voice">Voice</button>
+    <button data-p="feedback">Feedback</button>
     <div class="set-sec">Customize</div>
     <button data-go="skills">Skills</button><button data-go="mcp">Connectors</button><button data-go="plugins">Plugins</button>
   </nav>
@@ -247,9 +299,17 @@
     <div data-page="code" class="set-page" hidden>
       <h3>Claude Code</h3>
       <div class="set-row"><div><b>Default model</b><small>Default, Opus, Sonnet, Haiku or a custom ID (for example a Bedrock inference profile).</small></div><select id="setModel"></select></div>
+      <div class="set-row"><div><b>Thinking effort</b><small>How hard Claude thinks before answering. Higher is slower and costs more.</small></div><select id="setEffort"><option value="">Default</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">Very high</option><option value="max">Max</option></select></div>
       <div class="set-row"><div><b>Permissions for Code sessions</b></div><select id="setMode"><option value="default">Ask before changes</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="plan">Plan only</option></select></div>
       <div class="set-row"><div><b>Permissions for Cowork and routines</b></div><select id="setCoworkMode"><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes</option></select></div>
       <div class="set-row"><div><b>Browser actions</b><small>Let Claude open and drive a web browser (Playwright) in new sessions.</small></div><label class="switch"><input type="checkbox" id="setBrowser"><span></span></label></div>
+    </div>
+    <div data-page="feedback" class="set-page" hidden>
+      <h3>Feedback</h3>
+      <p class="muted small">"Request a fix" (the life-ring button at the bottom of the sidebar) files an issue on GitHub. Without a token, it tries the <code>gh</code> command, then opens a prefilled issue page in your browser.</p>
+      <div class="set-row"><div><b>Repository</b><small>owner/name on GitHub</small></div><input id="setRepo" placeholder="gabrieljadeau/claude-web-ui"></div>
+      <div class="set-row"><div><b>GitHub token</b><small id="setTokenHint">Optional. A fine-grained token with "Issues: write" on that repository.</small></div><input id="setToken" type="password" placeholder="github_pat_…" autocomplete="off"></div>
+      <div class="set-row"><div><b>Try it</b></div><button class="btn" id="setReportTry">Open the form</button></div>
     </div>
     <div data-page="voice" class="set-page" hidden>
       <h3>Voice</h3>
@@ -258,6 +318,27 @@
     </div>
   </div>
 </dialog>
+
+<!-- Request a fix -->
+<dialog id="reportDlg">
+  <div class="dlg-head">Request a fix</div>
+  <form class="dlg-body form" id="reportForm">
+    <div class="pills" id="reportKind"><button type="button" data-k="bug" class="active">Something's broken</button><button type="button" data-k="feature">Something's missing</button></div>
+    <p class="muted small" id="reportIntro">Tell us what you saw. The app version, system and recent errors come with it automatically.</p>
+    <label>Title <input id="rpTitle" required maxlength="200" placeholder="The reply stops after the first line"></label>
+    <label id="rpPrimaryLbl">What happened <textarea id="rpPrimary" rows="4" placeholder="The message you saw, the button that did nothing…"></textarea></label>
+    <label id="rpSecondaryLbl">What should have happened <textarea id="rpSecondary" rows="3" placeholder="The result you were expecting instead."></textarea></label>
+    <label id="rpImpactLbl">Impact <select id="rpImpact"><option value="blocking">Can't work</option><option value="slowing" selected>Slowing me down</option><option value="cosmetic">Cosmetic</option></select></label>
+    <label class="chk"><input type="checkbox" id="rpErrors" checked> Include the recent error messages of this session</label>
+    <div class="actions"><button type="button" class="btn" id="rpCancel">Cancel</button><button type="submit" class="btn dark" id="rpSend">Send report</button></div>
+    <p class="small" id="rpResult"></p>
+  </form>
+</dialog>
+
+<div id="preview" class="preview" hidden>
+  <div class="preview-head"><span class="nm" id="previewName"></span><span class="spacer"></span><button class="btn" id="previewReveal">Show in folder</button><a class="btn" id="previewOpen" target="_blank" rel="noopener">Open in new tab</a><button class="ib" id="previewClose" title="Close">✕</button></div>
+  <div class="preview-body" id="previewBody"></div>
+</div>
 
 <!-- Folder picker -->
 <dialog id="folderDlg">

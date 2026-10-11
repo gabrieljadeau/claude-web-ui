@@ -16,12 +16,17 @@ Everything runs on your own computer, on `127.0.0.1` only. Nothing is exposed to
 - **Routines** — prompts that run on a schedule (daily, every N minutes, once) in a folder, with templates and run history
 - **Customize** — install and manage **skills** (`~/.claude/skills`), **connectors** (MCP servers) and **plugins**
   (official marketplace), shared with the terminal `claude`
+- **Dashboard** — spend per day, model and type, context use per session, chats waiting for an approval (allow or refuse from there), routines
+- **Progress panel** on the right of every session: Claude's plan, files it created or changed (with preview), every step with details, helper agents
+- **In the chat**: live "Thinking" and working status with timer, compact step summaries, copy buttons, edit / retry / branch on any message,
+  messages typed while Claude works are queued and sent in order ("Send now" interrupts), ↑ edits the last message
+- **Request a fix** — a form that files a GitHub issue on the project (token, `gh` command, or a prefilled issue page)
 - Several sessions can run at the same time; the sidebar shows which ones are working or need an approval
 - **Approvals**: Allow / Always allow / Refuse before Claude edits files, runs commands or acts in the browser
 - Model picker (default, Opus, Sonnet, Haiku, or any model ID such as a Bedrock inference profile), permission modes
 - Drag and drop or paste files, **voice input** (French, Spanish, English), optional read-aloud
 - **Browser actions**: Claude can open a browser, navigate, click and fill pages (via [Playwright MCP](https://github.com/microsoft/playwright-mcp))
-- Search (Ctrl/⌘+K), rename, pin, archive, delete, light and dark theme
+- Search palette (`⌘K`, `Ctrl+K` or `/`), rename, pin, archive, delete, light and dark theme, text size and width
 
 ## Requirements
 

@@ -17,10 +17,11 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
+import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
-  query, listSessions, getSessionMessages, renameSession, deleteSession,
+  query, listSessions, getSessionMessages, renameSession, deleteSession, forkSession,
 } from '@anthropic-ai/claude-agent-sdk';
 
 // ---------------------------------------------------------------- 1. config
@@ -44,6 +45,8 @@ for (const d of [DATA_DIR, CHAT_DIR, UPLOAD_DIR, PROBE_DIR]) fs.mkdirSync(d, { r
 
 const KINDS = ['chat', 'cowork', 'code', 'routine'];
 const MODES = ['default', 'acceptEdits', 'plan', 'bypassPermissions'];
+const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
+const REPO = detectRepo();
 
 const PROMPTS = {
   common: 'You are being used through a local web interface on the user\'s computer (Claude Web UI). Keep answers readable: short paragraphs, lists where helpful.',
@@ -65,7 +68,7 @@ function browserServer() {
 // ------------------------------------------------------- persistent state
 const state = loadState();
 function loadState() {
-  const def = { projects: [], routines: [], meta: {}, settings: { model: '', mode: 'default', coworkMode: 'acceptEdits', browser: true, lang: 'fr-FR' } };
+  const def = { projects: [], routines: [], meta: {}, usage: [], settings: { model: '', effort: '', mode: 'default', coworkMode: 'acceptEdits', browser: true, lang: 'fr-FR', repo: '', githubToken: '' } };
   try {
     const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     return { ...def, ...s, settings: { ...def.settings, ...(s.settings || {}) } };
@@ -137,10 +140,13 @@ function createRuntime({ kind, cwd, sdkId = null, title = '', items = [], mode, 
     status: 'idle',               // idle | running | waiting
     mode: mode || (kind === 'cowork' || kind === 'routine' ? state.settings.coworkMode : state.settings.mode),
     model: model ?? state.settings.model,
+    effort: state.settings.effort || '',
     browser: state.settings.browser,
+    lastUuid: null,               // uuid of the last assistant message: the cut point used by edit / retry
+    liveThinking: '',
     routineId,
     abort: null, pending: new Map(), alwaysAllow: new Set(),
-    liveText: '', cost: 0, lastActivity: Date.now(), unread: false, createdAt: Date.now(),
+    liveText: '', cost: 0, totalCost: 0, context: null, lastActivity: Date.now(), unread: false, createdAt: Date.now(),
   };
   runtimes.set(rt.localId, rt);
   if (sdkId) bySdk.set(sdkId, rt);
@@ -150,15 +156,19 @@ function createRuntime({ kind, cwd, sdkId = null, title = '', items = [], mode, 
 function emit(rt, ev) {
   // keep the transcript in memory so a client that opens the session later sees everything
   switch (ev.type) {
-    case 'user': rt.items.push({ type: 'user', text: ev.text, files: ev.files }); break;
+    case 'user': rt.items.push({ type: 'user', text: ev.text, files: ev.files, prev: ev.prev ?? null }); break;
+    case 'thinkingStart': rt.liveThinking = ''; break;
+    case 'thinkingDelta': rt.liveThinking += ev.text; break;
+    case 'thinking': rt.liveThinking = ''; rt.items.push({ type: 'thinking', text: ev.text }); break;
     case 'delta': rt.liveText += ev.text; break;
     case 'assistantText': rt.liveText = ''; rt.items.push({ type: 'assistant', text: ev.text }); break;
-    case 'toolUse': rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false }); break;
+    case 'toolUse': if (!ev.parent) rt.liveText = ''; rt.items.push({ type: 'tool', id: ev.id, name: ev.name, input: ev.input, result: null, isError: false, parent: ev.parent || null }); break;
+    case 'subText': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.parent); if (t) t.subText = (t.subText ? t.subText + '\n' : '') + ev.text; break; }
     case 'toolResult': { const t = rt.items.find((i) => i.type === 'tool' && i.id === ev.id); if (t) { t.result = ev.content; t.isError = ev.isError; } break; }
     case 'permission': rt.items.push({ type: 'perm', id: ev.id, tool: ev.tool, input: ev.input, answer: null }); break;
     case 'permitted': { const p = rt.items.find((i) => i.type === 'perm' && i.id === ev.id); if (p) p.answer = ev.answer; break; }
     case 'note': if (ev.err && sameError(rt, ev.text)) return; rt.items.push({ type: 'note', text: ev.text, err: !!ev.err }); break;
-    case 'done': rt.liveText = ''; if (!ev.ok && sameError(rt, ev.message)) ev = { ...ev, message: null }; rt.items.push({ type: 'done', ok: ev.ok, cost: ev.cost, message: ev.message }); break;
+    case 'done': rt.liveText = ''; rt.liveThinking = ''; if (!ev.ok && sameError(rt, ev.message)) ev = { ...ev, message: null }; rt.items.push({ type: 'done', ok: ev.ok, cost: ev.cost, ms: ev.ms, model: ev.model, message: ev.message }); break;
   }
   rt.lastActivity = Date.now();
   broadcast({ type: 'ev', sid: rt.localId, ev });
@@ -220,6 +230,7 @@ function queryOptions(rt, ac) {
     includePartialMessages: true,
     permissionMode: rt.mode,
     model: rt.model || undefined,
+    effort: rt.effort || undefined,
     systemPrompt: { type: 'preset', preset: 'claude_code', append: append.join(' ') },
     mcpServers: browser ? { browser: browserServer() } : {},
     canUseTool: makePermissionHandler(rt),
@@ -270,14 +281,33 @@ function handleSdkMessage(rt, m) {
     if (m.error) emit(rt, { type: 'note', text: `Authentication: ${m.error}`, err: true });
     return;
   }
-  if (m.parent_tool_use_id) return; // hide subagent internals
+  if (m.parent_tool_use_id) {
+    // Helper agent (subagent) activity: forwarded with its parent so the UI can nest it.
+    const parent = m.parent_tool_use_id;
+    if (m.type === 'assistant') {
+      for (const b of m.message?.content || []) {
+        if (b.type === 'tool_use') emit(rt, { type: 'toolUse', id: b.id, name: b.name, input: b.input, parent });
+        else if (b.type === 'text' && b.text?.trim()) emit(rt, { type: 'subText', parent, text: b.text.slice(0, 1500) });
+      }
+    } else if (m.type === 'user' && Array.isArray(m.message?.content)) {
+      for (const b of m.message.content) if (b.type === 'tool_result') emit(rt, { type: 'toolResult', id: b.tool_use_id, isError: !!b.is_error, content: resultText(b.content), parent });
+    }
+    return;
+  }
   if (m.type === 'stream_event') {
     const e = m.event;
-    if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta') emit(rt, { type: 'delta', text: e.delta.text });
+    if (e?.type === 'content_block_start' && e.content_block?.type === 'thinking') emit(rt, { type: 'thinkingStart' });
+    if (e?.type === 'content_block_delta') {
+      if (e.delta?.type === 'text_delta') emit(rt, { type: 'delta', text: e.delta.text });
+      else if (e.delta?.type === 'thinking_delta') emit(rt, { type: 'thinkingDelta', text: e.delta.thinking });
+    }
     return;
   }
   if (m.type === 'assistant') {
     const content = m.message?.content || [];
+    if (m.uuid) rt.lastUuid = m.uuid;
+    const thinking = content.filter((b) => b.type === 'thinking').map((b) => b.thinking).join('\n\n');
+    if (thinking) emit(rt, { type: 'thinking', text: thinking });
     const text = content.filter((b) => b.type === 'text').map((b) => b.text).join('\n\n');
     if (text) emit(rt, { type: 'assistantText', text });
     for (const b of content) if (b.type === 'tool_use') emit(rt, { type: 'toolUse', id: b.id, name: b.name, input: b.input });
@@ -293,8 +323,22 @@ function handleSdkMessage(rt, m) {
   }
   if (m.type === 'result') {
     const ok = m.subtype === 'success' && !m.is_error;
-    if (typeof m.total_cost_usd === 'number') rt.cost += m.total_cost_usd;
-    emit(rt, { type: 'done', ok, cost: typeof m.total_cost_usd === 'number' ? m.total_cost_usd : null,
+    // total_cost_usd is cumulative for a resumed session: the turn's cost is the difference.
+    const total = typeof m.total_cost_usd === 'number' ? m.total_cost_usd : null;
+    const turnCost = total === null ? null : Math.max(0, total - (rt.totalCost || 0));
+    if (total !== null) { rt.totalCost = total; rt.cost += turnCost; }
+    const mu = m.modelUsage || {};
+    const models = Object.entries(mu).sort((a, b) => (b[1].costUSD || 0) - (a[1].costUSD || 0));
+    const u = m.usage || {};
+    const used = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.output_tokens || 0);
+    const window = models.reduce((w, [, x]) => Math.max(w, x.contextWindow || 0), 0);
+    if (used) rt.context = { used, window: window || 200000 };
+    const model = rt.model || (models[0] ? (models[0][1].canonicalModel || models[0][0]) : '');
+    state.usage.push({ at: Date.now(), sid: rt.sdkId, kind: rt.kind, title: (rt.title || firstUserText(rt) || '').slice(0, 80), model: String(model).slice(0, 80), cost: turnCost || 0,
+      in: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), out: u.output_tokens || 0, ms: m.duration_ms || 0, turns: m.num_turns || 0 });
+    if (state.usage.length > 4000) state.usage = state.usage.slice(-3000);
+    saveState();
+    emit(rt, { type: 'done', ok, cost: turnCost, ms: m.duration_ms || 0, context: rt.context, model,
       message: ok ? null : (m.errors?.join?.('\n') || m.result || m.subtype) });
     if (!ok && m.startup_failure_reason) checkAuth();
   }
@@ -309,30 +353,44 @@ async function openFromDisk(sdkId, cwd) {
   const msgs = await getSessionMessages(sdkId, dir ? { dir } : undefined).catch(() => []);
   const meta = metaOf(sdkId);
   const kind = meta.kind || (dir === CHAT_DIR ? 'chat' : 'code');
-  return createRuntime({ kind, cwd: dir || os.homedir(), sdkId, title: info?.customTitle || info?.summary || '', items: simplifyHistory(msgs), routineId: meta.routineId || null });
+  const { items, lastUuid } = simplifyHistory(msgs);
+  const rt = createRuntime({ kind, cwd: dir || os.homedir(), sdkId, title: info?.customTitle || info?.summary || '', items, routineId: meta.routineId || null });
+  rt.lastUuid = lastUuid;
+  return rt;
 }
 
 function simplifyHistory(msgs) {
   const out = [];
   const tools = new Map();
+  let lastUuid = null;
   for (const m of msgs) {
-    if (m.parent_tool_use_id) continue;
     const c = m.message?.content;
+    if (m.parent_tool_use_id) {
+      if (!Array.isArray(c)) continue;
+      for (const b of c) {
+        if (b.type === 'tool_use') { const t = { type: 'tool', id: b.id, name: b.name, input: b.input, result: null, isError: false, parent: m.parent_tool_use_id }; tools.set(b.id, t); out.push(t); }
+        else if (b.type === 'tool_result') { const t = tools.get(b.tool_use_id); if (t) { t.result = resultText(b.content); t.isError = !!b.is_error; } }
+      }
+      continue;
+    }
     if (m.type === 'user') {
-      if (typeof c === 'string') { if (c.trim() && !isMetaPrompt(c)) out.push({ type: 'user', text: c }); continue; }
+      if (typeof c === 'string') { if (c.trim() && !isMetaPrompt(c)) out.push({ type: 'user', text: c, prev: lastUuid }); continue; }
       if (!Array.isArray(c)) continue;
       for (const b of c) {
         if (b.type === 'tool_result') { const t = tools.get(b.tool_use_id); if (t) { t.result = resultText(b.content); t.isError = !!b.is_error; } }
       }
       const text = c.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-      if (text.trim() && !isMetaPrompt(text)) out.push({ type: 'user', text });
+      if (text.trim() && !isMetaPrompt(text)) out.push({ type: 'user', text, prev: lastUuid });
     } else if (m.type === 'assistant' && Array.isArray(c)) {
+      if (m.uuid) lastUuid = m.uuid;
+      const thinking = c.filter((b) => b.type === 'thinking').map((b) => b.thinking).join('\n\n');
+      if (thinking.trim()) out.push({ type: 'thinking', text: thinking });
       const text = c.filter((b) => b.type === 'text').map((b) => b.text).join('\n\n');
       if (text.trim()) out.push({ type: 'assistant', text });
       for (const b of c) if (b.type === 'tool_use') { const t = { type: 'tool', id: b.id, name: b.name, input: b.input, result: null, isError: false }; tools.set(b.id, t); out.push(t); }
     }
   }
-  return out;
+  return { items: out, lastUuid };
 }
 function isMetaPrompt(s) { return /^<(local-command|command-name|system-reminder|bash-input)/.test(s.trim()); }
 
@@ -361,8 +419,9 @@ async function sidebar() {
     if (!rt.sdkId && !rt.items.length && rt.status === 'idle') continue; // empty new chat, not sent yet
     const meta = rt.sdkId ? metaOf(rt.sdkId) : {};
     if (rt.sdkId) seen.add(rt.sdkId);
+    const pending = rt.items.filter((i) => i.type === 'perm' && !i.answer).map((i) => ({ id: i.id, tool: i.tool, input: i.input }));
     push({ sid: rt.localId, sdkId: rt.sdkId, kind: rt.kind, title: rt.title || firstUserText(rt) || 'New chat', cwd: rt.cwd, when: rt.lastActivity,
-      status: rt.status, waiting: rt.pending.size, unread: rt.unread, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId || meta.routineId || null, live: true });
+      status: rt.status, waiting: rt.pending.size, pending, context: rt.context, cost: rt.cost, unread: rt.unread, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId || meta.routineId || null, live: true });
   }
   for (const s of disk) {
     if (seen.has(s.sessionId) || s.cwd === PROBE_DIR) continue;
@@ -606,6 +665,13 @@ function displayName() {
 }
 
 // ------------------------------------------------------------- 5. HTTP
+const FILE_MIME = { '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.json': 'application/json', '.css': 'text/css', '.js': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8' };
+// Files Claude produced may be previewed only when they live in a folder this app works in.
+function isAllowedFile(p) {
+  const abs = path.resolve(String(p || ''));
+  const roots = [DATA_DIR, ...state.projects.map((x) => x.path), ...[...runtimes.values()].map((r) => r.cwd)];
+  return roots.some((r) => abs === r || abs.startsWith(r + path.sep));
+}
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
@@ -617,6 +683,14 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
     res.end(await fsp.readFile(path.join(PUBLIC, 'index.html')));
+    return;
+  }
+  if (url.pathname === '/file') {
+    const p = url.searchParams.get('path') || '';
+    if (url.searchParams.get('t') !== TOKEN || !isAllowedFile(p) || !fs.existsSync(p) || !fs.statSync(p).isFile()) { res.writeHead(403); res.end('Not allowed'); return; }
+    const raw = url.searchParams.get('raw') === '1';
+    res.writeHead(200, { 'Content-Type': raw ? 'text/plain; charset=utf-8' : (FILE_MIME[path.extname(p).toLowerCase()] || 'application/octet-stream'), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    fs.createReadStream(p).pipe(res);
     return;
   }
   const file = path.normalize(path.join(PUBLIC, url.pathname));
@@ -645,13 +719,13 @@ server.on('upgrade', (req, socket, head) => {
 function sessionInfo(rt) {
   const meta = rt.sdkId ? metaOf(rt.sdkId) : {};
   return { sid: rt.localId, sdkId: rt.sdkId, kind: rt.kind, cwd: rt.cwd, title: rt.title || firstUserText(rt), status: rt.status, mode: rt.mode, model: rt.model,
-    browser: rt.browser, cost: rt.cost, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId };
+    browser: rt.browser, effort: rt.effort, cost: rt.cost, context: rt.context, pinned: !!meta.pinned, archived: !!meta.archived, routineId: rt.routineId };
 }
 
 wss.on('connection', async (ws) => {
   clients.add(ws);
   const send = (obj) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); };
-  send({ type: 'hello', platform: process.platform, home: os.homedir(), user: displayName(), chatDir: CHAT_DIR, version: APP_VERSION, settings: state.settings, auth, routines: state.routines });
+  send({ type: 'hello', platform: process.platform, home: os.homedir(), user: displayName(), chatDir: CHAT_DIR, version: APP_VERSION, settings: publicSettings(), auth, routines: state.routines, repo: state.settings.repo || REPO, token: TOKEN });
   send({ type: 'sessions', items: await sidebar(), projects: projects() });
   if (!auth.checked) checkAuth();
 
@@ -668,6 +742,7 @@ wss.on('connection', async (ws) => {
           const r = createRuntime({ kind, cwd });
           if (typeof msg.mode === 'string' && MODES.includes(msg.mode)) r.mode = msg.mode;
           if (typeof msg.model === 'string') r.model = msg.model.trim().slice(0, 200);
+          if (EFFORTS.includes(msg.effort)) r.effort = msg.effort;
           send({ type: 'opened', info: sessionInfo(r), items: [], liveText: '' });
           break;
         }
@@ -675,7 +750,7 @@ wss.on('connection', async (ws) => {
           let r = rt;
           if (!r) r = await openFromDisk(msg.sid, msg.cwd);
           r.unread = false;
-          send({ type: 'opened', info: sessionInfo(r), items: r.items, liveText: r.liveText });
+          send({ type: 'opened', info: sessionInfo(r), items: r.items, liveText: r.liveText, liveThinking: r.liveThinking });
           sidebarDirty();
           break;
         }
@@ -685,9 +760,38 @@ wss.on('connection', async (ws) => {
           let text = msg.text.trim();
           if (!text && files.length) text = 'Please look at the attached files.';
           if (!text) break;
-          emit(rt, { type: 'user', text, files: files.map((f) => path.basename(f)) });
+          if (msg.edit) {
+            // Edit / retry: continue from a copy of the conversation cut just before the edited message.
+            const upTo = typeof msg.edit.upTo === 'string' ? msg.edit.upTo : null;
+            const idx = rt.items.findIndex((i) => i.type === 'user' && (i.prev || null) === upTo);
+            if (rt.sdkId) bySdk.delete(rt.sdkId);
+            if (upTo && rt.sdkId) {
+              try { const f = await forkSession(rt.sdkId, { dir: rt.cwd, upToMessageId: upTo, title: rt.title || undefined }); rt.sdkId = f.sessionId; bySdk.set(rt.sdkId, rt); setMeta(rt.sdkId, { kind: rt.kind }); }
+              catch (err) { send({ type: 'error', message: 'Could not branch the conversation: ' + (err.message || err) }); bySdk.set(rt.sdkId, rt); break; }
+            } else { rt.sdkId = null; }
+            rt.lastUuid = upTo;
+            rt.items = idx >= 0 ? rt.items.slice(0, idx) : [];
+            rt.alwaysAllow.clear();
+            send({ type: 'opened', info: sessionInfo(rt), items: rt.items, liveText: '' });
+            invalidateListing();
+          }
+          emit(rt, { type: 'user', text, files: files.map((f) => path.basename(f)), prev: rt.lastUuid });
           if (files.length) text += `\n\nAttached files (read them with your tools):\n${files.map((f) => `- ${f}`).join('\n')}`;
           runTurn(rt, text);
+          sidebarDirty();
+          break;
+        }
+        case 'fork': {
+          // Branch: a new conversation that contains everything up to (and including) the given assistant message.
+          if (!rt) break;
+          const upTo = typeof msg.upTo === 'string' ? msg.upTo : null;
+          let nr;
+          if (upTo && rt.sdkId) {
+            try { const f = await forkSession(rt.sdkId, { dir: rt.cwd, upToMessageId: upTo, title: (rt.title || 'Chat') + ' (branch)' }); invalidateListing(); nr = await openFromDisk(f.sessionId, rt.cwd); nr.kind = rt.kind; setMeta(nr.sdkId, { kind: rt.kind }); }
+            catch (err) { send({ type: 'error', message: 'Could not branch: ' + (err.message || err) }); break; }
+          } else nr = createRuntime({ kind: rt.kind, cwd: rt.cwd, mode: rt.mode, model: rt.model });
+          nr.mode = rt.mode; nr.model = rt.model; nr.effort = rt.effort; nr.browser = rt.browser;
+          send({ type: 'opened', info: sessionInfo(nr), items: nr.items, liveText: '', draft: msg.draft || '' });
           sidebarDirty();
           break;
         }
@@ -702,12 +806,14 @@ wss.on('connection', async (ws) => {
           if (!resolve) break;
           if (msg.always) rt.alwaysAllow.add(allowKey(msg.tool || ''));
           resolve(msg.allow ? { behavior: 'allow' } : { behavior: 'deny', message: 'The user refused this action.' });
+          sidebarDirty();
           break;
         }
         case 'sessionSettings': {
           if (!rt) break;
           if (MODES.includes(msg.mode)) rt.mode = msg.mode;
           if (typeof msg.model === 'string') rt.model = msg.model.trim().slice(0, 200);
+          if (EFFORTS.includes(msg.effort)) rt.effort = msg.effort;
           if (typeof msg.browser === 'boolean') rt.browser = msg.browser;
           send({ type: 'info', info: sessionInfo(rt) });
           break;
@@ -736,6 +842,7 @@ wss.on('connection', async (ws) => {
           break;
         }
         case 'sessions': invalidateListing(); send({ type: 'sessions', items: await sidebar(), projects: projects() }); break;
+        case 'dashboard': send({ type: 'dashboard', usage: state.usage.slice(-3000), items: await sidebar(), routines: state.routines }); break;
 
         // ---- projects & folders
         case 'addProject': {
@@ -747,6 +854,24 @@ wss.on('connection', async (ws) => {
         }
         case 'removeProject': state.projects = state.projects.filter((p) => p.path !== msg.path); saveState(); sidebarDirty(); break;
         case 'ls': send({ type: 'ls', ref: msg.ref, ...(await listDirs(msg.path)) }); break;
+        case 'pickFolder': {
+          const dir = await pickFolderNative(safeDir(msg.start) || os.homedir());
+          send({ type: 'picked', ref: msg.ref, path: dir || null, unavailable: dir === undefined });
+          break;
+        }
+        case 'reveal': {
+          const p = String(msg.path || '');
+          if (!isAllowedFile(p) || !fs.existsSync(p)) break;
+          if (IS_WIN) execFile('explorer.exe', [`/select,${path.resolve(p)}`]);
+          else if (IS_MAC) execFile('open', ['-R', p]);
+          else execFile('xdg-open', [path.dirname(p)]);
+          break;
+        }
+        case 'report': {
+          try { send({ type: 'reported', ...(await fileIssue(msg)) }); }
+          catch (err) { send({ type: 'reported', error: String(err.message || err) }); }
+          break;
+        }
         case 'upload': {
           const name = path.basename(String(msg.name || 'file')).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') || 'file';
           const buf = Buffer.from(String(msg.data || ''), 'base64');
@@ -831,7 +956,10 @@ wss.on('connection', async (ws) => {
           if (typeof msg.browser === 'boolean') s.browser = msg.browser;
           if (typeof msg.lang === 'string') s.lang = msg.lang.slice(0, 10);
           if (typeof msg.name === 'string') s.name = msg.name.trim().slice(0, 60);
-          saveState(); broadcast({ type: 'settings', settings: s, user: displayName() });
+          if (EFFORTS.includes(msg.effort)) s.effort = msg.effort;
+          if (typeof msg.repo === 'string') s.repo = msg.repo.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').slice(0, 120);
+          if (typeof msg.githubToken === 'string') s.githubToken = msg.githubToken.trim().slice(0, 200);
+          saveState(); broadcast({ type: 'settings', settings: publicSettings(), user: displayName(), repo: s.repo || REPO });
           break;
         }
         case 'authCheck': send({ type: 'auth', auth: await checkAuth() }); break;
@@ -889,6 +1017,79 @@ async function listDirs(p) {
   const up = path.dirname(dir);
   const parent = up !== dir ? up : (IS_WIN ? 'drives' : null);
   return { path: dir, parent, dirs: entries, home: os.homedir() };
+}
+
+function pickFolderNative(start) {
+  return new Promise((resolve) => {
+    const done = (err, stdout) => {
+      if (err && err.code === 'ENOENT') return resolve(undefined);
+      const p = String(stdout || '').trim();
+      resolve(p && fs.existsSync(p) ? p : '');
+    };
+    if (IS_WIN) {
+      const ps = [
+        '[Console]::OutputEncoding=[Text.Encoding]::UTF8', 'Add-Type -AssemblyName System.Windows.Forms',
+        '$d=New-Object System.Windows.Forms.FolderBrowserDialog', "$d.Description='Choose the folder Claude will work in'",
+        '$d.UseDescriptionForTitle=$true', '$d.ShowNewFolderButton=$true',
+        'if ($env:CWUI_START -and (Test-Path $env:CWUI_START)) { $d.SelectedPath=$env:CWUI_START }',
+        '$f=New-Object System.Windows.Forms.Form', "$f.TopMost=$true; $f.ShowInTaskbar=$false; $f.WindowState='Minimized'",
+        "if ($d.ShowDialog($f) -eq 'OK') { [Console]::Out.Write($d.SelectedPath) }",
+      ].join('; ');
+      execFile('powershell.exe', ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', ps], { env: { ...process.env, CWUI_START: start }, windowsHide: true, timeout: 600000 }, done);
+    } else if (IS_MAC) {
+      execFile('osascript', ['-e', 'POSIX path of (choose folder with prompt "Choose the folder Claude will work in")'], { timeout: 600000 }, done);
+    } else {
+      execFile('zenity', ['--file-selection', '--directory', `--filename=${start}/`], { timeout: 600000 }, done);
+    }
+  });
+}
+
+function publicSettings() { const { githubToken, ...rest } = state.settings; return { ...rest, hasToken: !!githubToken }; }
+
+function detectRepo() {
+  try {
+    const cfg = fs.readFileSync(path.join(ROOT, '.git', 'config'), 'utf8');
+    const m = cfg.match(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\s/);
+    if (m) return m[1];
+  } catch { /* no git */ }
+  return 'gabrieljadeau/claude-web-ui';
+}
+
+// "Request a fix": files a GitHub issue. Uses a token from settings, else the gh CLI, else hands back a prefilled new-issue link.
+async function fileIssue(msg) {
+  const repo = state.settings.repo || REPO;
+  const kind = msg.kind === 'feature' ? 'feature' : 'bug';
+  const title = String(msg.title || '').trim().slice(0, 200) || (kind === 'bug' ? 'Bug report' : 'Feature request');
+  const impact = { blocking: "Blocking — can't work", slowing: 'Slowing me down', cosmetic: 'Cosmetic' }[msg.impact] || '';
+  const ctx = [
+    `- App: Claude Web UI ${APP_VERSION}`, `- OS: ${process.platform} ${os.release()} · Node ${process.version}`,
+    `- Claude Code: ${auth.cli || 'unknown'} · provider: ${auth.provider} · connected: ${auth.connected}`,
+    msg.view ? `- Where: ${msg.view}` : '', msg.userAgent ? `- Browser: ${String(msg.userAgent).slice(0, 160)}` : '',
+  ].filter(Boolean).join('\n');
+  const body = [
+    kind === 'bug' ? '### What happened' : '### What it should do', String(msg.primary || '').trim() || '_(not given)_', '',
+    kind === 'bug' ? '### What should have happened' : '### Why it matters', String(msg.secondary || '').trim() || '_(not given)_', '',
+    impact ? `**Impact:** ${impact}\n` : '', msg.errors ? '### Recent errors\n```\n' + String(msg.errors).slice(0, 3000) + '\n```\n' : '',
+    '### Context', ctx, '', `_Reported from the app by ${displayName()} on ${new Date().toISOString()}_`,
+  ].filter((x) => x !== null).join('\n');
+  const labels = [kind === 'bug' ? 'bug' : 'enhancement'];
+  const token = state.settings.githubToken || process.env.GITHUB_TOKEN;
+  if (token) {
+    const data = JSON.stringify({ title, body, labels });
+    const r = await new Promise((resolve, reject) => {
+      const req = https.request({ hostname: 'api.github.com', path: `/repos/${repo}/issues`, method: 'POST', headers: { 'User-Agent': 'claude-web-ui', Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
+        (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => resolve({ status: res.statusCode, body: b })); });
+      req.on('error', reject); req.end(data);
+    });
+    let j = {}; try { j = JSON.parse(r.body); } catch { /* not JSON */ }
+    if (r.status >= 200 && r.status < 300 && j.html_url) return { url: j.html_url, via: 'token' };
+    throw new Error(`GitHub refused the issue (${r.status}): ${j.message || r.body.slice(0, 200)}`);
+  }
+  const gh = await runCmd('gh', ['issue', 'create', '-R', repo, '-t', title, '-b', body, '-l', labels[0]], 30000);
+  if (!gh.err && /https:\/\/github\.com\/\S+\/issues\/\d+/.test(gh.stdout)) return { url: gh.stdout.match(/https:\/\/github\.com\/\S+\/issues\/\d+/)[0], via: 'gh' };
+  const link = `https://github.com/${repo}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}&labels=${labels[0]}`;
+  openBrowser(link);
+  return { url: link, via: 'browser' };
 }
 
 function openBrowser(url) {
