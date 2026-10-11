@@ -225,7 +225,7 @@ body.space-code .welcome .suggest { display: none; }
 .plist .prow { display: flex; align-items: center; gap: 12px; padding: 12px 6px; border-bottom: 1px solid var(--line2); }
 .plist .grp { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; border: 0; background: none; padding: 22px 6px 6px; color: var(--ink); font-size: 14px; } .plist .grp:hover .tt { text-decoration: underline; }
 .plist .grp svg { width: 14px; height: 14px; color: var(--muted); align-self: center; flex: none; } .plist .grp .tt { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .plist .grp small { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.plist .grp + .prow { border-top: 1px solid var(--line2); }
+.plist .grp + .prow { border-top: 1px solid var(--line2); } .plist .prow.click { cursor: pointer; } .plist .prow.click:hover { background: var(--hover); border-radius: 8px; }
 /* Artifacts: Drive-like list/grid switcher and preview cards */
 .view-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-left: 6px; }
 .view-seg button { border: 0; background: var(--panel); padding: 0 12px; height: 34px; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }

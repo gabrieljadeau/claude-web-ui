@@ -1348,8 +1348,9 @@
         box.appendChild(g); continue;
       }
       for (const a of files) {
-        const r = el('div', 'prow'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
+        const r = el('div', 'prow click'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
         r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${shortPath(a.path)}`;
+        r.onclick = (e) => { if (!e.target.closest('button')) openArtifact(a); };
         const o = el('button', 'btn', tr('Open')); o.onclick = () => openArtifact(a);
         const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path });
         r.append(o, f); box.appendChild(r);

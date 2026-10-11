@@ -1071,7 +1071,8 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/file') {
     const p = url.searchParams.get('path') || '';
-    if (url.searchParams.get('t') !== TOKEN || !isAllowedFile(p) || !fs.existsSync(p) || !fs.statSync(p).isFile()) { res.writeHead(403); res.end('Not allowed'); return; }
+    // Artifacts may live outside every allowed root (scratchpad, Desktop…): the index vouches for those exact paths.
+    if (url.searchParams.get('t') !== TOKEN || (!isAllowedFile(p) && !artifactPaths.has(path.resolve(p))) || !fs.existsSync(p) || !fs.statSync(p).isFile()) { res.writeHead(403); res.end('Not allowed'); return; }
     const raw = url.searchParams.get('raw') === '1';
     res.writeHead(200, { 'Content-Type': raw ? 'text/plain; charset=utf-8' : (FILE_MIME[path.extname(p).toLowerCase()] || 'application/octet-stream'), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     fs.createReadStream(p).pipe(res);
