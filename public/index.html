@@ -3,540 +3,301 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Web UI</title>
-<style>
-  :root {
-    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6f6c66; --line: #e3e0da;
-    --accent: #c4633f; --accent-ink: #ffffff; --soft: #efece6; --danger: #b3261e; --ok: #2e7d32;
-    --code: #f1efea; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1a18; --panel: #24231f; --ink: #ecebe7; --muted: #a29f97; --line: #38362f;
-      --soft: #2d2b27; --code: #2d2b27; --shadow: none; }
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 15px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
-    display: grid; grid-template-columns: 270px 1fr; }
-  button, select, input, textarea { font: inherit; color: inherit; }
-  button { cursor: pointer; }
-
-  /* Sidebar */
-  aside { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
-  .brand { padding: 16px 16px 8px; font-weight: 600; letter-spacing: .2px; display: flex; align-items: center; gap: 8px; }
-  .brand i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; }
-  .side-btn { margin: 4px 12px; padding: 9px 12px; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; text-align: left; }
-  .side-btn:hover { background: var(--soft); }
-  .folder { margin: 8px 12px; padding: 8px 10px; background: var(--soft); border-radius: 10px; font-size: 13px; }
-  .folder .label { color: var(--muted); font-size: 12px; }
-  .folder .path { word-break: break-all; }
-  .folder button { margin-top: 6px; border: 0; background: none; color: var(--accent); padding: 0; font-size: 13px; }
-  .sessions-title { padding: 12px 16px 4px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
-  #sessions { overflow-y: auto; flex: 1; padding: 0 8px 12px; }
-  .sess { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; font-size: 14px; }
-  .sess:hover { background: var(--soft); }
-  .sess.active { background: var(--soft); font-weight: 600; }
-  .sess small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
-  .sess span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  /* Main */
-  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100vh; }
-  header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
-  header label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-  header select, header input[type=text] { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 5px 8px; }
-  .toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
-  .spacer { flex: 1; }
-  #status { font-size: 12px; color: var(--muted); }
-  #status.bad { color: var(--danger); }
-
-  #chat { flex: 1; overflow-y: auto; padding: 24px 0 12px; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
-  .msg { margin: 0 0 18px; }
-  .msg.user .bubble { background: var(--soft); border-radius: 14px; padding: 10px 14px; display: inline-block; max-width: 100%; white-space: pre-wrap; }
-  .msg.user { text-align: right; }
-  .msg.user .bubble { text-align: left; }
-  .msg.assistant .bubble { padding: 2px 2px; }
-  .bubble p { margin: 0 0 10px; }
-  .bubble p:last-child { margin-bottom: 0; }
-  .bubble pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
-  .bubble code { background: var(--code); padding: 1px 4px; border-radius: 4px; font-family: Consolas, ui-monospace, monospace; font-size: 13px; }
-  .bubble pre code { background: none; padding: 0; }
-  .bubble ul, .bubble ol { margin: 0 0 10px; padding-left: 22px; }
-  .bubble h1, .bubble h2, .bubble h3 { font-size: 16px; margin: 14px 0 6px; }
-  .bubble a { color: var(--accent); }
-
-  .tool { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; margin: 8px 0; font-size: 13px; }
-  .tool summary { padding: 7px 10px; cursor: pointer; display: flex; gap: 8px; align-items: center; list-style: none; }
-  .tool summary::-webkit-details-marker { display: none; }
-  .tool .name { font-weight: 600; }
-  .tool .arg { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; font-family: Consolas, ui-monospace, monospace; }
-  .tool .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-  .tool.ok .dot { background: var(--ok); } .tool.err .dot { background: var(--danger); }
-  .tool pre { margin: 0; padding: 8px 10px; border-top: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; font-size: 12px; font-family: Consolas, ui-monospace, monospace; }
-
-  .perm { border: 1.5px solid var(--accent); background: var(--panel); border-radius: 12px; padding: 12px 14px; margin: 10px 0; box-shadow: var(--shadow); }
-  .perm .q { font-weight: 600; margin-bottom: 6px; }
-  .perm pre { background: var(--code); border-radius: 8px; padding: 8px 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; margin: 0 0 10px; }
-  .perm .btns { display: flex; gap: 8px; flex-wrap: wrap; }
-  .perm.done { border-color: var(--line); opacity: .75; box-shadow: none; }
-  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; }
-  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .btn:disabled { opacity: .5; cursor: default; }
-  .note { color: var(--muted); font-size: 13px; margin: 6px 0 16px; }
-  .note.err { color: var(--danger); }
-  .empty { text-align: center; color: var(--muted); margin-top: 18vh; }
-  .empty h2 { color: var(--ink); font-weight: 600; margin-bottom: 6px; }
-
-  /* Composer */
-  .composer { padding: 10px 0 16px; }
-  .box { border: 1px solid var(--line); background: var(--panel); border-radius: 16px; box-shadow: var(--shadow); padding: 8px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 6px; }
-  .chips:empty { display: none; }
-  .chip { background: var(--soft); border-radius: 999px; padding: 3px 4px 3px 10px; font-size: 12px; display: flex; align-items: center; gap: 4px; }
-  .chip.loading { opacity: .6; }
-  .chip button { border: 0; background: none; padding: 0 6px; color: var(--muted); }
-  textarea { width: 100%; border: 0; outline: none; resize: none; background: transparent; padding: 6px 8px; min-height: 44px; max-height: 240px; }
-  .row { display: flex; align-items: center; gap: 6px; }
-  .icon { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; }
-  .icon svg { width: 18px; height: 18px; }
-  .icon.rec { background: var(--danger); border-color: var(--danger); color: #fff; animation: pulse 1.2s infinite; }
-  @keyframes pulse { 50% { opacity: .65; } }
-  #send { margin-left: auto; }
-  .row select { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px; font-size: 13px; }
-  #interim { color: var(--muted); font-style: italic; font-size: 13px; padding: 0 8px; }
-
-  /* Drop overlay & dialog */
-  #drop { position: fixed; inset: 0; background: rgba(196,99,63,.12); border: 3px dashed var(--accent); display: none; place-items: center; font-size: 20px; font-weight: 600; color: var(--accent); z-index: 50; pointer-events: none; }
-  body.dragging #drop { display: grid; }
-  dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(560px, 92vw); background: var(--panel); color: var(--ink); }
-  dialog::backdrop { background: rgba(0,0,0,.35); }
-  .dlg-head { padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 600; }
-  .dlg-path { padding: 8px 16px; font-size: 13px; color: var(--muted); word-break: break-all; }
-  #dirs { max-height: 50vh; overflow-y: auto; padding: 4px 8px; }
-  #dirs button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 8px; }
-  #dirs button:hover { background: var(--soft); }
-  .dlg-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
-
-  @media (max-width: 760px) { body { grid-template-columns: 1fr; } aside { display: none; } }
-</style>
+<title>Claude</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23d97757' d='M16 2l2.6 9.4L28 8l-7 7 9 1-9 1 7 7-9.4-3.4L16 30l-2.6-9.4L4 24l7-7-9-1 9-1-7-7 9.4 3.4z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<aside>
-  <div class="brand"><i></i> Claude Web UI</div>
-  <button class="side-btn" id="newChat">+ New chat</button>
-  <div class="folder">
-    <div class="label">Working folder</div>
-    <div class="path" id="cwd">…</div>
-    <button id="changeFolder">Change folder</button>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-star" viewBox="0 0 32 32"><path fill="currentColor" d="M16 2l2.6 9.4L28 8l-7 7 9 1-9 1 7 7-9.4-3.4L16 30l-2.6-9.4L4 24l7-7-9-1 9-1-7-7 9.4 3.4z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+  <symbol id="i-cowork" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/><path d="M12 12v5M9.5 14.5h5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 8h18v12H3zM3 8l2-4h14l2 4M10 12h4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-skill" viewBox="0 0 24 24"><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 01-12 0zM12 18v3"/></symbol>
+  <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M10 4a2 2 0 114 0v2h4v4h-2a2 2 0 100 4h2v4h-4v-2a2 2 0 10-4 0v2H6v-4h2a2 2 0 100-4H6V6h4z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+  <symbol id="i-attach" viewBox="0 0 24 24"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5"/></symbol>
+</svg>
+
+<aside id="sidebar">
+  <div class="sb-top">
+    <button class="ib" id="collapseBtn" title="Hide sidebar"><svg><use href="#i-panel"/></svg></button>
+    <div class="brand" id="brand">Claude</div>
+    <div class="seg" id="tabs" title="Chat · Cowork · Code">
+      <button data-tab="chat" title="Chat"><svg><use href="#i-chat"/></svg></button>
+      <button data-tab="cowork" title="Cowork"><svg><use href="#i-cowork"/></svg></button>
+      <button data-tab="code" title="Code"><svg><use href="#i-code"/></svg></button>
+    </div>
   </div>
-  <div class="sessions-title">History</div>
-  <div id="sessions"></div>
+  <button class="sb-search" id="searchBtn"><svg><use href="#i-search"/></svg><span>Search</span><kbd>⌘K</kbd></button>
+  <nav class="sb-nav">
+    <button id="newBtn"><svg><use href="#i-plus"/></svg><span id="newLabel">New</span></button>
+    <button id="navProjects"><svg><use href="#i-folder"/></svg><span>Projects</span></button>
+    <button id="navRoutines"><svg><use href="#i-clock"/></svg><span>Routines</span></button>
+    <button id="navCustomize"><svg><use href="#i-box"/></svg><span>Customize</span></button>
+  </nav>
+  <div class="sec-head"><span id="recentsLabel">Recents</span><button class="ib sm" id="refreshBtn" title="Refresh"><svg><use href="#i-clock"/></svg></button></div>
+  <div class="sb-list" id="list"></div>
+  <div class="sb-foot">
+    <button class="user" id="userBtn">
+      <span class="avatar" id="avatar">G</span>
+      <span class="u-text"><span id="userName">…</span><small id="authLabel">Checking connection…</small></span>
+      <span class="dot" id="authDot"></span>
+    </button>
+    <button class="ib" id="settingsBtn" title="Settings"><svg><use href="#i-gear"/></svg></button>
+  </div>
 </aside>
 
-<main>
-  <header>
-    <label>Model
-      <select id="model">
-        <option value="">Default</option>
-        <option value="opus">Opus</option>
-        <option value="sonnet">Sonnet</option>
-        <option value="haiku">Haiku</option>
-        <option value="__custom">Custom ID…</option>
-      </select>
-    </label>
-    <label>Mode
-      <select id="mode">
-        <option value="default">Ask before changes</option>
-        <option value="acceptEdits">Auto-accept file edits</option>
-        <option value="plan">Plan only (no changes)</option>
-      </select>
-    </label>
-    <label class="toggle"><input type="checkbox" id="browser" checked> Browser actions</label>
-    <label class="toggle"><input type="checkbox" id="speak"> Read replies aloud</label>
-    <span class="spacer"></span>
-    <span id="status">Connecting…</span>
-  </header>
+<main id="main">
+  <button class="ib" id="expandBtn" title="Show sidebar" hidden><svg><use href="#i-panel"/></svg></button>
 
-  <div id="chat"><div class="wrap" id="log"></div></div>
+  <!-- Welcome -->
+  <section id="viewWelcome" class="view">
+    <div class="welcome">
+      <h1><svg class="star"><use href="#i-star"/></svg><span id="welcomeTitle">Welcome</span></h1>
+      <div class="composer-box" id="welcomeComposer"></div>
+      <div class="under">
+        <button class="chip" id="projectChip"><svg><use href="#i-folder"/></svg><span id="projectChipText">Project</span><svg><use href="#i-chev"/></svg></button>
+        <span class="spacer"></span>
+        <button class="chip ghost" id="modelChip"><span id="modelChipText">Default model</span></button>
+        <button class="chip ghost" id="modeChip"><span id="modeChipText">Ask</span></button>
+      </div>
+      <div class="jump" id="jump"></div>
+    </div>
+  </section>
 
-  <div class="composer"><div class="wrap">
-    <div class="box">
-      <div class="chips" id="chips"></div>
-      <textarea id="input" rows="1" placeholder="Message Claude… (Enter to send, Shift+Enter for a new line, drop files anywhere)"></textarea>
-      <div id="interim"></div>
-      <div class="row">
-        <button class="icon" id="attach" title="Attach files">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5"/></svg>
-        </button>
-        <input type="file" id="fileInput" multiple hidden>
-        <button class="icon" id="mic" title="Talk (click to start / stop)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
-        </button>
-        <select id="lang" title="Voice language">
-          <option value="fr-FR">Français</option>
-          <option value="es-ES">Español</option>
-          <option value="en-US">English</option>
-        </select>
-        <button class="btn primary" id="send">Send</button>
+  <!-- Session -->
+  <section id="viewSession" class="view" hidden>
+    <header class="s-head">
+      <span class="kind" id="sKind">Code</span>
+      <div class="s-title-wrap"><input id="sTitle" class="s-title" placeholder="Untitled" spellcheck="false"><div class="s-path" id="sPath"></div></div>
+      <span class="s-status" id="sStatus"></span>
+      <select id="sModel" title="Model"></select>
+      <select id="sMode" title="Permissions">
+        <option value="default">Ask before changes</option><option value="acceptEdits">Auto-accept edits</option><option value="bypassPermissions">Autonomous</option><option value="plan">Plan only</option>
+      </select>
+      <label class="chk" id="sBrowserWrap" title="Let Claude open and use the web browser"><input type="checkbox" id="sBrowser"> Browser</label>
+      <button class="ib" id="sPin" title="Pin"><svg><use href="#i-pin"/></svg></button>
+      <button class="ib" id="sMore" title="More"><svg><use href="#i-more"/></svg></button>
+    </header>
+    <div id="chat"><div class="wrap" id="log"></div></div>
+    <div class="composer"><div class="wrap"><div class="composer-box" id="sessionComposer"></div></div></div>
+  </section>
+
+  <!-- Projects -->
+  <section id="viewProjects" class="view page" hidden>
+    <div class="page-in">
+      <div class="page-head"><h1>Projects</h1><span class="spacer"></span><button class="btn dark" id="addProjectBtn">Add folder</button></div>
+      <p class="muted">A project is a folder on this computer. Claude works inside it for Code sessions and Cowork tasks.</p>
+      <div class="plist" id="projectList"></div>
+    </div>
+  </section>
+
+  <!-- Routines -->
+  <section id="viewRoutines" class="view page" hidden>
+    <div class="page-in">
+      <div class="page-head"><h1>Routines</h1><span class="spacer"></span><button class="btn dark" id="newRoutineBtn">New routine</button></div>
+      <div class="pills" id="routineTabs"><button data-t="yours" class="active">Yours</button><button data-t="templates">Templates</button></div>
+      <div id="routinesYours"></div>
+      <div id="routinesTemplates" class="cards" hidden></div>
+    </div>
+  </section>
+
+  <!-- Routine detail -->
+  <section id="viewRoutine" class="view page" hidden>
+    <div class="page-in">
+      <div class="page-head"><button class="ib" id="rBack" title="Back"><svg style="transform:rotate(90deg)"><use href="#i-chev"/></svg></button><h1 id="rName"></h1><span class="spacer"></span>
+        <label class="switch"><input type="checkbox" id="rEnabled"><span></span></label>
+        <button class="btn dark" id="rRun">Run now</button><button class="btn" id="rEdit">Edit</button><button class="btn danger" id="rDelete">Delete</button></div>
+      <div class="r-grid">
+        <div class="card"><div class="card-t">Schedule</div><div id="rSchedule"></div><div class="muted" id="rNext"></div></div>
+        <div class="card"><div class="card-t">Runs in</div><div id="rCwd" class="mono"></div><div class="muted" id="rMode"></div></div>
+        <div class="card wide"><div class="card-t">Prompt</div><pre id="rPrompt"></pre></div>
+        <div class="card wide"><div class="card-t">Past runs</div><div id="rRuns"></div></div>
       </div>
     </div>
-  </div></div>
+  </section>
+
+  <!-- Routine editor -->
+  <section id="viewRoutineEdit" class="view page" hidden>
+    <div class="page-in narrow">
+      <div class="page-head"><button class="ib" id="reBack" title="Back"><svg style="transform:rotate(90deg)"><use href="#i-chev"/></svg></button><h1 id="reTitle">New routine</h1></div>
+      <form id="routineForm" class="form">
+        <label>Name <input id="reName" required maxlength="120" placeholder="Morning summary"></label>
+        <label>What should Claude do? <textarea id="rePrompt" required rows="6" placeholder="Read the new files in the Inbox folder, summarise them in SUMMARY.md…"></textarea></label>
+        <div class="row2">
+          <label>Folder <span class="inline"><input id="reCwd" required placeholder="/path/to/folder"><button type="button" class="btn" id="reBrowse">Browse…</button></span></label>
+          <label>Permissions <select id="reMode"><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes (needs you present)</option></select></label>
+        </div>
+        <div class="row2">
+          <label>Repeat <select id="reType"><option value="daily">Every day at a time</option><option value="interval">Every N minutes</option><option value="once">Once, at a date and time</option></select></label>
+          <label id="reDailyWrap">Time <input type="time" id="reTime" value="09:00"></label>
+          <label id="reIntervalWrap" hidden>Every (minutes) <input type="number" id="reEvery" min="1" value="60"></label>
+          <label id="reOnceWrap" hidden>When <input type="datetime-local" id="reAt"></label>
+        </div>
+        <div id="reDays" class="days">
+          <label><input type="checkbox" value="1" checked> Mon</label><label><input type="checkbox" value="2" checked> Tue</label><label><input type="checkbox" value="3" checked> Wed</label>
+          <label><input type="checkbox" value="4" checked> Thu</label><label><input type="checkbox" value="5" checked> Fri</label><label><input type="checkbox" value="6"> Sat</label><label><input type="checkbox" value="0"> Sun</label>
+        </div>
+        <label>Model <input id="reModel" placeholder="Default (leave empty) or a model ID"></label>
+        <p class="muted small">Routines run only while this app is open (the terminal window). Each run is a normal session you can open from the sidebar.</p>
+        <div class="actions"><button type="button" class="btn" id="reCancel">Cancel</button><button type="submit" class="btn dark">Save routine</button></div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Customize -->
+  <section id="viewCustomize" class="view page" hidden>
+    <div class="page-in">
+      <div class="page-head"><h1>Customize</h1></div>
+      <div class="pills" id="custTabs"><button data-t="skills" class="active">Skills</button><button data-t="mcp">Connectors</button><button data-t="plugins">Plugins</button></div>
+
+      <div id="custSkills">
+        <div class="toolbar"><input id="skillSearch" placeholder="Search skills"><span class="spacer"></span><button class="btn dark" id="skillAddBtn">Add skill</button></div>
+        <p class="muted small">Skills are folders with a <code>SKILL.md</code> file that teach Claude a workflow. Installed in <code>~/.claude/skills</code>; the terminal <code>claude</code> uses them too.</p>
+        <div class="rows" id="skillList"></div>
+      </div>
+
+      <div id="custMcp" hidden>
+        <div class="toolbar"><span class="muted small">Connectors (MCP servers) give Claude tools: web services, databases, your own scripts.</span><span class="spacer"></span><button class="btn dark" id="mcpAddBtn">Add connector</button></div>
+        <div class="rows" id="mcpList"></div>
+      </div>
+
+      <div id="custPlugins" hidden>
+        <div class="toolbar"><div class="pills small" id="plugTabs"><button data-t="installed" class="active">Installed</button><button data-t="discover">Discover</button></div>
+          <input id="plugSearch" placeholder="Search plugins"><select id="plugCat"><option value="">All categories</option></select><span class="spacer"></span><button class="btn" id="mkAddBtn">Add marketplace</button></div>
+        <div class="rows" id="plugInstalled"></div>
+        <div class="cards" id="plugDiscover" hidden></div>
+      </div>
+    </div>
+  </section>
 </main>
 
-<div id="drop">Drop files to attach</div>
+<!-- Connect screen -->
+<div id="connect" class="overlay" hidden>
+  <div class="panel">
+    <svg class="star big"><use href="#i-star"/></svg>
+    <h2>Connect Claude</h2>
+    <p id="connectText">This interface uses the same login as the <code>claude</code> terminal command.</p>
+    <ol>
+      <li>Open a terminal and run <code>claude</code>.</li>
+      <li>Follow the login steps (for Amazon Bedrock, your company's setup), then type <code>/exit</code>.</li>
+      <li>Come back here and press <b>Check again</b>.</li>
+    </ol>
+    <div class="actions">
+      <button class="btn" id="connectOpen">Open a terminal with claude</button>
+      <button class="btn dark" id="connectCheck">Check again</button>
+      <button class="btn" id="connectTest">Test with a real request</button>
+      <button class="btn link" id="connectSkip">Continue anyway</button>
+    </div>
+    <pre id="connectDetail" class="muted small"></pre>
+  </div>
+</div>
 
-<dialog id="folderDlg">
-  <div class="dlg-head">Choose the working folder</div>
-  <div class="dlg-path" id="dlgPath"></div>
-  <div id="dirs"></div>
-  <div class="dlg-foot">
-    <button class="btn" id="dlgCancel">Cancel</button>
-    <button class="btn primary" id="dlgChoose">Use this folder</button>
+<!-- Search palette -->
+<div id="search" class="overlay top" hidden>
+  <div class="panel narrow"><input id="searchInput" placeholder="Search chats, projects, routines, skills…" autocomplete="off"><div id="searchResults"></div></div>
+</div>
+
+<!-- Settings -->
+<dialog id="settingsDlg" class="settings">
+  <nav class="set-nav">
+    <div class="set-sec">Settings</div>
+    <button data-p="general" class="active">General</button>
+    <button data-p="connection">Connection</button>
+    <button data-p="code">Claude Code</button>
+    <button data-p="voice">Voice</button>
+    <div class="set-sec">Customize</div>
+    <button data-go="skills">Skills</button><button data-go="mcp">Connectors</button><button data-go="plugins">Plugins</button>
+  </nav>
+  <div class="set-body">
+    <button class="ib set-close" id="settingsClose" title="Close">✕</button>
+    <div data-page="general" class="set-page">
+      <h3>General</h3>
+      <div class="set-row"><div><b>Your name</b><small>Used in the greeting.</small></div><input id="setName" maxlength="60" placeholder="Name"></div>
+      <h3 style="margin-top:18px">Appearance</h3>
+      <div class="set-row"><div><b>Theme</b></div><div class="pills small" id="themePills"><button data-v="auto">System</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+      <div class="set-row"><div><b>Transcript text size</b><small>Size of the conversation text.</small></div><div class="pills small" id="sizePills"><button data-v="s">Small</button><button data-v="m">Medium</button><button data-v="l">Large</button></div></div>
+      <div class="set-row"><div><b>Transcript width</b><small>Maximum width of the transcript and composer.</small></div><div class="pills small" id="widthPills"><button data-v="n">Narrow</button><button data-v="m">Medium</button><button data-v="w">Wide</button></div></div>
+      <div class="set-row"><div><b>Show archived chats</b><small>Archived chats stay on disk but are hidden from Recents.</small></div><label class="switch"><input type="checkbox" id="setArchived"><span></span></label></div>
+      <p class="muted small" id="aboutLine"></p>
+    </div>
+    <div data-page="connection" class="set-page" hidden>
+      <h3>Connection</h3>
+      <div class="set-row"><div><b>Status</b><small id="connStatus">…</small></div><button class="btn" id="connCheck">Check</button></div>
+      <div class="set-row"><div><b>Log in</b><small>Opens a terminal running <code>claude</code>, where you log in (Amazon Bedrock, Claude account…).</small></div><button class="btn" id="connLogin">Open terminal</button></div>
+      <div class="set-row"><div><b>Test</b><small>Sends one tiny request to verify everything works end to end.</small></div><button class="btn" id="connTest">Send test</button></div>
+      <pre class="muted small" id="connDetail"></pre>
+    </div>
+    <div data-page="code" class="set-page" hidden>
+      <h3>Claude Code</h3>
+      <div class="set-row"><div><b>Default model</b><small>Default, Opus, Sonnet, Haiku or a custom ID (for example a Bedrock inference profile).</small></div><select id="setModel"></select></div>
+      <div class="set-row"><div><b>Permissions for Code sessions</b></div><select id="setMode"><option value="default">Ask before changes</option><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="plan">Plan only</option></select></div>
+      <div class="set-row"><div><b>Permissions for Cowork and routines</b></div><select id="setCoworkMode"><option value="acceptEdits">Auto-accept file edits</option><option value="bypassPermissions">Autonomous (never ask)</option><option value="default">Ask before changes</option></select></div>
+      <div class="set-row"><div><b>Browser actions</b><small>Let Claude open and drive a web browser (Playwright) in new sessions.</small></div><label class="switch"><input type="checkbox" id="setBrowser"><span></span></label></div>
+    </div>
+    <div data-page="voice" class="set-page" hidden>
+      <h3>Voice</h3>
+      <div class="set-row"><div><b>Language</b><small>For dictation and read-aloud.</small></div><select id="setLang"><option value="fr-FR">Français</option><option value="es-ES">Español</option><option value="en-US">English</option></select></div>
+      <div class="set-row"><div><b>Read replies aloud</b></div><label class="switch"><input type="checkbox" id="setSpeak"><span></span></label></div>
+    </div>
   </div>
 </dialog>
 
-<script>
-(() => {
-  const $ = (id) => document.getElementById(id);
-  const token = new URLSearchParams(location.search).get('t');
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem('cwui.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem('cwui.' + k, JSON.stringify(v)); } catch {} },
-  };
+<!-- Folder picker -->
+<dialog id="folderDlg">
+  <div class="dlg-head">Choose a folder</div>
+  <div class="dlg-path" id="dlgPath"></div>
+  <div id="dirs"></div>
+  <div class="dlg-foot"><button class="btn" id="dlgCancel">Cancel</button><button class="btn dark" id="dlgChoose">Use this folder</button></div>
+</dialog>
 
-  let ws, busy = false, sessionId = null, cwd = '', live = null, lastAssistantText = '';
-  const tools = new Map();          // tool_use id -> details element
-  const attachments = [];           // {ref, name, path|null}
+<!-- Add skill -->
+<dialog id="skillDlg">
+  <div class="dlg-head">Add a skill</div>
+  <div class="dlg-body form">
+    <label>From a Git URL <span class="inline"><input id="skUrl" placeholder="https://github.com/user/my-skill"><button class="btn" id="skUrlBtn">Install</button></span></label>
+    <label>From a folder on this computer <span class="inline"><input id="skPath" placeholder="/path/to/skill-folder"><button class="btn" id="skPathBrowse">Browse…</button><button class="btn" id="skPathBtn">Install</button></span></label>
+    <label>From a file <span class="inline"><input type="file" id="skFile" accept=".md,.zip"><button class="btn" id="skFileBtn">Install</button></span><small class="muted">A SKILL.md file or a .zip containing one.</small></label>
+    <label>Or let Claude write one <span class="inline"><input id="skIdea" placeholder="Describe the workflow, e.g. “weekly invoice follow-up emails”"><button class="btn dark" id="skIdeaBtn">Create with Claude</button></span></label>
+  </div>
+  <div class="dlg-foot"><button class="btn" id="skClose">Close</button></div>
+</dialog>
 
-  // ---------- connection ----------
-  function connect() {
-    ws = new WebSocket(`ws://${location.host}/ws?t=${encodeURIComponent(token || '')}`);
-    ws.onopen = () => setStatus('Connected');
-    ws.onclose = () => { setStatus('Disconnected — is the terminal window still open? Retrying…', true); setBusy(false); setTimeout(connect, 2500); };
-    ws.onmessage = (e) => handle(JSON.parse(e.data));
-  }
-  const send = (obj) => ws && ws.readyState === 1 && ws.send(JSON.stringify(obj));
-  function setStatus(t, bad) { $('status').textContent = t; $('status').classList.toggle('bad', !!bad); }
+<!-- Add connector -->
+<dialog id="mcpDlg">
+  <div class="dlg-head">Add a connector (MCP server)</div>
+  <form class="dlg-body form" id="mcpForm">
+    <label>Name <input id="mcName" required pattern="[\w.-]{1,60}" placeholder="github"></label>
+    <label>Type <select id="mcType"><option value="http">Remote (HTTP URL)</option><option value="sse">Remote (SSE URL)</option><option value="stdio">Local command</option></select></label>
+    <label id="mcUrlWrap">URL <input id="mcUrl" placeholder="https://mcp.example.com/mcp"></label>
+    <label id="mcHeadWrap">Headers (one per line, Name: value) <textarea id="mcHeaders" rows="2" placeholder="Authorization: Bearer …"></textarea></label>
+    <label id="mcCmdWrap" hidden>Command <input id="mcCmd" placeholder="npx -y @modelcontextprotocol/server-filesystem /path"></label>
+    <label id="mcEnvWrap" hidden>Environment variables (one per line, KEY=value) <textarea id="mcEnv" rows="2"></textarea></label>
+    <p class="muted small">Saved at user scope with <code>claude mcp add-json</code>; the terminal uses it too. Applies to new sessions.</p>
+    <div class="actions"><button type="button" class="btn" id="mcCancel">Cancel</button><button type="submit" class="btn dark">Add</button></div>
+  </form>
+</dialog>
 
-  function pushSettings() {
-    const sel = $('model').value;
-    const model = sel === '__custom' ? store.get('customModel', '') : sel;
-    send({ type: 'settings', mode: $('mode').value, browser: $('browser').checked, model });
-  }
+<div id="drop">Drop files to attach</div>
+<div id="toasts"></div>
+<div id="menu" class="menu" hidden></div>
 
-  // ---------- incoming ----------
-  function handle(m) {
-    switch (m.type) {
-      case 'hello': {
-        pushSettings();
-        const saved = store.get('cwd', null);
-        if (saved && saved !== m.cwd) send({ type: 'setCwd', path: saved }); else setCwd(m.cwd);
-        break;
-      }
-      case 'cwd': setCwd(m.cwd); store.set('cwd', m.cwd); break;
-      case 'session':
-        sessionId = m.id;
-        if (!m.id) clearLog();
-        markActiveSession();
-        break;
-      case 'busy':
-        setBusy(m.value);
-        if (!m.value) { finalizeLive(); send({ type: 'sessions' }); }
-        break;
-      case 'delta':
-        if (!live) live = addAssistant('');
-        live.raw += m.text; live.el.innerHTML = md(live.raw); scrollDown();
-        break;
-      case 'assistantText':
-        if (!live) live = addAssistant('');
-        live.raw = m.text; live.el.innerHTML = md(m.text);
-        lastAssistantText = m.text;
-        live = null; scrollDown();
-        break;
-      case 'toolUse': finalizeLive(); addTool(m); break;
-      case 'toolResult': {
-        const d = tools.get(m.id); if (!d) break;
-        d.classList.add(m.isError ? 'err' : 'ok');
-        const pre = document.createElement('pre'); pre.textContent = m.content || '(no output)'; d.appendChild(pre);
-        break;
-      }
-      case 'permission': addPermission(m); break;
-      case 'done':
-        if (!m.ok && m.message) note(m.message, true);
-        else if (m.cost != null) note(`Done · $${m.cost.toFixed(4)}`);
-        if ($('speak').checked && lastAssistantText) speak(lastAssistantText);
-        break;
-      case 'error': note(m.message, true); break;
-      case 'sessions': renderSessions(m.items); break;
-      case 'history': clearLog(); for (const h of m.items) {
-          if (h.role === 'user') addUser(h.text);
-          else { if (h.text) addAssistant(h.text); if (h.tools?.length) note('Used: ' + h.tools.join(', ')); }
-        } scrollDown(); break;
-      case 'ls': renderDirs(m); break;
-      case 'uploaded': {
-        const a = attachments.find((x) => x.ref === m.ref);
-        if (a) { a.path = m.path; renderChips(); }
-        break;
-      }
-    }
-  }
-
-  // ---------- chat rendering ----------
-  const log = $('log');
-  function clearLog() {
-    log.innerHTML = ''; tools.clear(); live = null;
-    log.innerHTML = '<div class="empty"><h2>What should we work on?</h2><div>Claude works in the folder shown on the left. Type, talk, or drop files.</div></div>';
-  }
-  function dropEmpty() { const e = log.querySelector('.empty'); if (e) e.remove(); }
-  function addUser(text) {
-    dropEmpty();
-    const d = document.createElement('div'); d.className = 'msg user';
-    const b = document.createElement('div'); b.className = 'bubble'; b.textContent = text;
-    d.appendChild(b); log.appendChild(d); scrollDown();
-  }
-  function addAssistant(text) {
-    dropEmpty();
-    const d = document.createElement('div'); d.className = 'msg assistant';
-    const b = document.createElement('div'); b.className = 'bubble'; b.innerHTML = md(text);
-    d.appendChild(b); log.appendChild(d);
-    return { el: b, raw: text };
-  }
-  function finalizeLive() { if (live && !live.raw.trim()) live.el.parentElement.remove(); live = null; }
-  function note(text, err) {
-    const d = document.createElement('div'); d.className = 'note' + (err ? ' err' : ''); d.textContent = text;
-    log.appendChild(d); scrollDown();
-  }
-  function toolArg(input) {
-    if (!input || typeof input !== 'object') return '';
-    return input.command || input.file_path || input.url || input.pattern || input.path || input.query || input.element || input.description || JSON.stringify(input).slice(0, 160);
-  }
-  function prettyTool(name) {
-    if (name.startsWith('mcp__browser__')) return 'Browser · ' + name.slice(14).replace(/^browser_/, '').replace(/_/g, ' ');
-    return name;
-  }
-  function addTool(m) {
-    dropEmpty();
-    const d = document.createElement('details'); d.className = 'tool';
-    const s = document.createElement('summary');
-    s.innerHTML = '<span class="dot"></span><span class="name"></span><span class="arg"></span>';
-    s.querySelector('.name').textContent = prettyTool(m.name);
-    s.querySelector('.arg').textContent = toolArg(m.input);
-    d.appendChild(s); log.appendChild(d); tools.set(m.id, d); scrollDown();
-  }
-  function addPermission(m) {
-    dropEmpty();
-    const d = document.createElement('div'); d.className = 'perm';
-    const q = document.createElement('div'); q.className = 'q';
-    q.textContent = `Claude wants to use ${prettyTool(m.tool)}`;
-    const pre = document.createElement('pre');
-    pre.textContent = typeof m.input === 'object' ? JSON.stringify(m.input, null, 2) : String(m.input);
-    const btns = document.createElement('div'); btns.className = 'btns';
-    const mk = (label, cls, allow, always) => {
-      const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = label;
-      b.onclick = () => {
-        send({ type: 'permit', id: m.id, tool: m.tool, allow, always });
-        d.classList.add('done'); btns.querySelectorAll('button').forEach((x) => (x.disabled = true));
-        q.textContent += allow ? ' — allowed' : ' — refused';
-      };
-      return b;
-    };
-    btns.append(
-      mk('Allow', 'primary', true, false),
-      mk(m.tool.startsWith('mcp__browser__') ? 'Allow all browser actions' : 'Always allow in this chat', '', true, true),
-      mk('Refuse', '', false, false),
-    );
-    d.append(q, pre, btns); log.appendChild(d); scrollDown();
-  }
-  function scrollDown() { const c = $('chat'); c.scrollTop = c.scrollHeight; }
-
-  // Minimal, safe Markdown (escape first, then format).
-  function esc(s) { return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-  function inline(s) {
-    return s
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  }
-  function md(src) {
-    const parts = String(src || '').split(/```/);
-    let html = '';
-    parts.forEach((part, i) => {
-      if (i % 2 === 1) { html += '<pre><code>' + esc(part.replace(/^[^\n]*\n/, '')) + '</code></pre>'; return; }
-      const lines = esc(part).split('\n');
-      let list = null, para = [];
-      const flushPara = () => { if (para.length) { html += '<p>' + inline(para.join('<br>')) + '</p>'; para = []; } };
-      const flushList = () => { if (list) { html += `</${list}>`; list = null; } };
-      for (const line of lines) {
-        let m;
-        if ((m = line.match(/^\s*#{1,3}\s+(.*)/))) { flushPara(); flushList(); html += '<h3>' + inline(m[1]) + '</h3>'; }
-        else if ((m = line.match(/^\s*[-*]\s+(.*)/))) { flushPara(); if (list !== 'ul') { flushList(); html += '<ul>'; list = 'ul'; } html += '<li>' + inline(m[1]) + '</li>'; }
-        else if ((m = line.match(/^\s*\d+[.)]\s+(.*)/))) { flushPara(); if (list !== 'ol') { flushList(); html += '<ol>'; list = 'ol'; } html += '<li>' + inline(m[1]) + '</li>'; }
-        else if (!line.trim()) { flushPara(); flushList(); }
-        else { flushList(); para.push(line); }
-      }
-      flushPara(); flushList();
-    });
-    return html;
-  }
-
-  // ---------- sending ----------
-  function setBusy(v) {
-    busy = v;
-    $('send').textContent = v ? 'Stop' : 'Send';
-    $('send').classList.toggle('primary', !v);
-    ['model', 'mode', 'browser', 'newChat', 'changeFolder'].forEach((id) => ($(id).disabled = v));
-    if (v) setStatus('Working…'); else if (ws?.readyState === 1) setStatus('Connected');
-  }
-  function submit() {
-    if (busy) { send({ type: 'stop' }); return; }
-    if (attachments.some((a) => !a.path)) { note('Files are still uploading — one moment.'); return; }
-    const text = $('input').value.trim();
-    if (!text && !attachments.length) return;
-    const files = attachments.map((a) => a.path);
-    const shown = text + (attachments.length ? `\n📎 ${attachments.map((a) => a.name).join(', ')}` : '');
-    addUser(shown);
-    send({ type: 'send', text: text || 'Please look at the attached files.', files });
-    $('input').value = ''; autosize();
-    attachments.length = 0; renderChips();
-    lastAssistantText = '';
-    if (recognizing) recognition.stop();
-  }
-  $('send').onclick = submit;
-  $('input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
-  });
-  function autosize() { const t = $('input'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 240) + 'px'; }
-  $('input').addEventListener('input', autosize);
-
-  // ---------- attachments (drag & drop + picker) ----------
-  function renderChips() {
-    const c = $('chips'); c.innerHTML = '';
-    for (const a of attachments) {
-      const chip = document.createElement('span'); chip.className = 'chip' + (a.path ? '' : ' loading');
-      chip.textContent = a.name + (a.path ? '' : ' (uploading…)');
-      const x = document.createElement('button'); x.textContent = '×'; x.title = 'Remove';
-      x.onclick = () => { attachments.splice(attachments.indexOf(a), 1); renderChips(); };
-      chip.appendChild(x); c.appendChild(chip);
-    }
-  }
-  function addFiles(list) {
-    for (const f of list) {
-      if (f.size > 25 * 1024 * 1024) { note(`${f.name} is larger than 25 MB.`, true); continue; }
-      const ref = Math.random().toString(36).slice(2);
-      attachments.push({ ref, name: f.name, path: null }); renderChips();
-      const r = new FileReader();
-      r.onload = () => send({ type: 'upload', ref, name: f.name, data: String(r.result).split(',')[1] || '' });
-      r.readAsDataURL(f);
-    }
-  }
-  $('attach').onclick = () => $('fileInput').click();
-  $('fileInput').onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
-  let dragDepth = 0;
-  window.addEventListener('dragenter', (e) => { if (e.dataTransfer?.types?.includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
-  window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
-  window.addEventListener('dragover', (e) => e.preventDefault());
-  window.addEventListener('drop', (e) => {
-    e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
-    if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
-  });
-  window.addEventListener('paste', (e) => { const f = e.clipboardData?.files; if (f?.length) { e.preventDefault(); addFiles(f); } });
-
-  // ---------- voice ----------
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognition = null, recognizing = false, baseText = '';
-  $('lang').value = store.get('lang', 'fr-FR');
-  $('lang').onchange = () => { store.set('lang', $('lang').value); if (recognition) recognition.lang = $('lang').value; };
-  if (!SR) { $('mic').disabled = true; $('mic').title = 'Voice input needs Microsoft Edge or Google Chrome'; }
-  else {
-    recognition = new SR();
-    recognition.continuous = true; recognition.interimResults = true;
-    recognition.onstart = () => { recognizing = true; $('mic').classList.add('rec'); baseText = $('input').value; };
-    recognition.onend = () => { recognizing = false; $('mic').classList.remove('rec'); $('interim').textContent = ''; };
-    recognition.onerror = (e) => { if (e.error === 'not-allowed') note('Microphone access was blocked. Allow it in the address bar (lock icon) and try again.', true); };
-    recognition.onresult = (e) => {
-      let finalText = '', interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
-      }
-      if (finalText) { baseText = (baseText ? baseText.replace(/\s*$/, ' ') : '') + finalText.trim(); $('input').value = baseText; autosize(); }
-      $('interim').textContent = interim;
-    };
-    $('mic').onclick = () => {
-      if (recognizing) { recognition.stop(); return; }
-      speechSynthesis?.cancel();
-      recognition.lang = $('lang').value;
-      try { recognition.start(); } catch {}
-    };
-  }
-  function speak(text) {
-    if (!window.speechSynthesis) return;
-    const plain = text.replace(/```[\s\S]*?```/g, ' (code) ').replace(/[`*#>_]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(plain.slice(0, 4000));
-    u.lang = $('lang').value;
-    speechSynthesis.speak(u);
-  }
-
-  // ---------- settings ----------
-  $('mode').value = store.get('mode', 'default');
-  $('browser').checked = store.get('browser', true);
-  $('speak').checked = store.get('speak', false);
-  const savedModel = store.get('model', '');
-  $('model').value = [...$('model').options].some((o) => o.value === savedModel) ? savedModel : '';
-  if (savedModel === '__custom') $('model').options[4].textContent = 'Custom: ' + store.get('customModel', '');
-  $('model').onchange = () => {
-    if ($('model').value === '__custom') {
-      const id = prompt('Model ID (for example an Amazon Bedrock model or inference profile ID):', store.get('customModel', ''));
-      if (!id) { $('model').value = store.get('model', '') === '__custom' ? '__custom' : ''; }
-      else { store.set('customModel', id.trim()); $('model').options[4].textContent = 'Custom: ' + id.trim(); }
-    }
-    store.set('model', $('model').value); pushSettings();
-  };
-  $('mode').onchange = () => { store.set('mode', $('mode').value); pushSettings(); };
-  $('browser').onchange = () => { store.set('browser', $('browser').checked); pushSettings(); };
-  $('speak').onchange = () => { store.set('speak', $('speak').checked); if (!$('speak').checked) speechSynthesis?.cancel(); };
-
-  // ---------- sessions & folder ----------
-  function setCwd(p) { cwd = p; $('cwd').textContent = p; send({ type: 'sessions' }); clearLog(); sessionId = null; }
-  function renderSessions(items) {
-    const box = $('sessions'); box.innerHTML = '';
-    if (!items.length) { box.innerHTML = '<div class="note" style="padding:0 10px">No chats in this folder yet.</div>'; return; }
-    for (const s of items) {
-      const b = document.createElement('button'); b.className = 'sess'; b.dataset.id = s.id;
-      const t = document.createElement('span'); t.textContent = s.title;
-      const w = document.createElement('small'); w.textContent = s.when ? new Date(s.when).toLocaleString() : '';
-      b.append(t, w);
-      b.onclick = () => { if (!busy) send({ type: 'openSession', id: s.id }); };
-      box.appendChild(b);
-    }
-    markActiveSession();
-  }
-  function markActiveSession() {
-    document.querySelectorAll('.sess').forEach((b) => b.classList.toggle('active', b.dataset.id === sessionId));
-  }
-  $('newChat').onclick = () => { if (!busy) send({ type: 'newChat' }); };
-
-  let dlgCurrent = null;
-  $('changeFolder').onclick = () => { send({ type: 'ls', path: cwd }); $('folderDlg').showModal(); };
-  $('dlgCancel').onclick = () => $('folderDlg').close();
-  $('dlgChoose').onclick = () => { if (dlgCurrent && dlgCurrent !== 'drives') send({ type: 'setCwd', path: dlgCurrent }); $('folderDlg').close(); };
-  function renderDirs(m) {
-    dlgCurrent = m.path;
-    $('dlgPath').textContent = m.path === 'drives' ? 'This PC' : m.path;
-    $('dlgChoose').disabled = m.path === 'drives';
-    const box = $('dirs'); box.innerHTML = '';
-    const add = (label, p) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => send({ type: 'ls', path: p }); box.appendChild(b); };
-    if (m.parent) add('⬆  Up', m.parent);
-    if (m.home && m.path !== m.home) add('🏠  Home', m.home);
-    for (const d of m.dirs) add('📁  ' + d.name, d.path);
-    if (!m.dirs.length) box.insertAdjacentHTML('beforeend', '<div class="note" style="padding:6px 10px">No subfolders.</div>');
-  }
-
-  clearLog();
-  connect();
-})();
-</script>
+<script src="/app.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "claude-web-ui",
-  "version": "0.1.0",
-  "description": "Local browser interface for Claude Code (works with Amazon Bedrock): chat, session history, approvals, voice input and browser automation.",
+  "version": "0.2.0",
+  "description": "Local browser interface for Claude Code (works with Amazon Bedrock): chat, cowork, code sessions per project, routines, skills, connectors, plugins, approvals, voice input and browser automation.",
   "type": "module",
   "main": "server.mjs",
   "scripts": {
