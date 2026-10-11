@@ -1894,6 +1894,9 @@
     paintSel();
   }
   function paintSel() { [...$('searchResults').querySelectorAll('.row')].forEach((x, i) => x.classList.toggle('sel', i === selIdx)); }
+  // e.code names the QWERTY position, so on an AZERTY Mac "M" is not KeyM: map the physical key to the letter it prints.
+  const keyByCode = {}; navigator.keyboard?.getLayoutMap?.().then((m) => m.forEach((v, c) => { if (/^[vmd]$/i.test(v)) keyByCode[c] = 'Key' + v.toUpperCase(); })).catch(() => {});
+  const voiceKey = (e) => { const k = keyByCode[e.code] || (Object.keys(keyByCode).length ? '' : e.code); return ['KeyV', 'KeyM', 'KeyD'].includes(k) ? k : ''; };
   $('keysBtn').onclick = () => $('keysDlg').showModal(); $('keysClose').onclick = () => $('keysDlg').close();
   window.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey; const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable;
@@ -1906,11 +1909,11 @@
     else if (mod && e.key.toLowerCase() === '.') { e.preventDefault(); if (S.view === 'session') openPanel(!paneState.progress, true); }
     // Voice shortcuts (Option + key, read from e.code since Option changes the character on a Mac):
     // ⌥V voice mode on/off, ⌥M mute / unmute the microphone in voice mode, ⌥D dictate into the composer, ⌥Space talk now.
-    else if (e.altKey && !mod && ['KeyV', 'KeyM', 'KeyD', 'Space'].includes(e.code)) {
-      e.preventDefault(); const V = window.Voice;
-      if (e.code === 'KeyV') { if (V?.isOpen()) V.close(); else document.querySelector('#viewSession:not([hidden]) .composer-box .icon.vm, #viewWelcome:not([hidden]) .composer-box .icon.vm')?.click(); }
-      else if (e.code === 'KeyM') { if (V?.isOpen()) V.toggleMute(); }
-      else if (e.code === 'Space') { if (V?.isOpen()) V.talkNow(); }
+    else if (e.altKey && !mod && (voiceKey(e) || e.code === 'Space')) {
+      e.preventDefault(); const V = window.Voice; const k = e.code === 'Space' ? 'Space' : voiceKey(e);
+      if (k === 'KeyV') { if (V?.isOpen()) V.close(); else document.querySelector('#viewSession:not([hidden]) .composer-box .icon.vm, #viewWelcome:not([hidden]) .composer-box .icon.vm')?.click(); }
+      else if (k === 'KeyM') { if (V?.isOpen()) V.toggleMute(); }
+      else if (k === 'Space') { if (V?.isOpen()) V.talkNow(); }
       else document.querySelector('#viewSession:not([hidden]) .composer-box .icon.mic, #viewWelcome:not([hidden]) .composer-box .icon.mic')?.click();
     }
     else if (e.key === 'Escape') { closeSearch(); $('menu').hidden = true; if (fullPane) setFull(fullPane, false); if (S.selecting && !S.suggesting) setSelecting(false); }
