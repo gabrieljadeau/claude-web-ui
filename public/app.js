@@ -65,10 +65,10 @@
       case 'whatsNew': showWhatsNew(m); break;
       case 'authTest': toast(m.ok ? tr('Connection works. Claude replied: "{reply}"', { reply: m.reply }) : tr('Request failed: {message}', { message: m.message }), !m.ok, 8000); $('connectDetail').textContent = $('connDetail').textContent = m.ok ? '' : m.message; break;
       case 'opened': openSessionView(m.info, m.items, m.liveText, m.liveThinking); if (m.draft) sessionComposer.setText(m.draft); if (S.openAfter) { openFile(S.openAfter); S.openAfter = null; } break;
-      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; renderList(); if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
+      case 'artifacts': S.artifacts = m.items; S.artifactsLoaded = true; $('artifactCount').textContent = m.items.length; $('artifactCount').hidden = !m.items.length; renderList(); if (S.view === 'projects') renderProjects(); if (!$('search').hidden) renderSearch(); if (S.view === 'artifacts') renderArtifacts(); break;
       case 'info': if (S.info && m.info.sid === S.info.sid) { S.info = m.info; renderSessionHead(); syncPanes(); } break;
       case 'sdkId': if (S.info && m.sid === S.info.sid) S.info.sdkId = m.sdkId; break;
-      case 'status': if (S.info && m.sid === S.info.sid) { S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
+      case 'status': if (S.info && m.sid === S.info.sid) { window.Voice?.onStatus(m.status); S.info.status = m.status; renderSessionHead(); sessionComposer.setBusy(m.status !== 'idle'); if (m.status === 'idle') hideWorking(); else showWorking(m.status === 'waiting' ? tr('Waiting for your approval') : null); } if (m.status === 'idle') flushQueue(m.sid); break;
       case 'ev': if (S.info && m.sid === S.info.sid) renderEvent(m.ev); else if (m.ev.type === 'done' && m.ev.ok === false && m.ev.message) toast(m.ev.message, true); else if (m.ev.type === 'permission') toast(tr('A chat needs your approval. See the sidebar or the Dashboard.'), false, 5000); break;
       case 'ls': renderDirs(m); break;
       case 'picked': onPicked(m); break;
@@ -238,6 +238,8 @@
     const h = el('div', 'grp-head'); h.innerHTML = `<span class="arrow">▼</span><span class="name"></span>`;
     h.querySelector('.name').textContent = name; h.title = folder || name;
     if (folder) {
+      const sids = new Set(items.map((s) => s.sid)); const nArt = S.artifacts.reduce((n, a) => n + (sids.has(a.sid) ? 1 : 0), 0);
+      if (nArt) { const g = el('span', 'badge art', nArt); g.title = nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt }); h.appendChild(g); }
       const plus = el('button', 'ib sm'); plus.title = tr('New session in this folder'); plus.innerHTML = icon('plus');
       plus.onclick = (e) => { e.stopPropagation(); showWelcome(folder); };
       h.appendChild(plus);
@@ -366,7 +368,7 @@
     if (info.status !== 'idle') showWorking(info.status === 'waiting' ? tr('Waiting for your approval') : null);
     editing = null; $('editHint').hidden = true; renderQueue(); panesOnSession();
     scrollDown(true); sessionComposer.focus();
-    if (pendingFirst) { const m = pendingFirst; pendingFirst = null; send({ type: 'send', sid: info.sid, text: m.text, files: m.files }); }
+    if (pendingFirst) { const m = pendingFirst; pendingFirst = null; send({ type: 'send', sid: info.sid, text: m.text, files: m.files, voice: !!m.voice }); }
   }
   function renderSessionHead() {
     const i = S.info; if (!i) return;
@@ -440,15 +442,15 @@
       case 'thinkingStart': openThinking(); break;
       case 'thinkingDelta': openThinking(); V.think.querySelector('.tbody').textContent += ev.text; break;
       case 'thinking': openThinking(); setThinking(ev.text, true); break;
-      case 'delta': if (!V.live) V.live = addProse('', true); V.live.raw += ev.text; renderInto(V.live.el, V.live.raw); scrollDown(); break;
-      case 'assistantText': if (!V.live) V.live = addProse('', true); V.live.raw = ev.text; renderInto(V.live.el, ev.text, true); V.lastText = ev.text; V.live = null; V.group = null; scrollDown(); break;
+      case 'delta': if (!V.live) V.live = addProse('', true); V.live.raw += ev.text; renderInto(V.live.el, V.live.raw); scrollDown(); window.Voice?.onDelta(ev.text); break;
+      case 'assistantText': if (!V.live) V.live = addProse('', true); V.live.raw = ev.text; renderInto(V.live.el, ev.text, true); V.lastText = ev.text; V.live = null; V.group = null; scrollDown(); window.Voice?.onAssistantText(ev.text); break;
       case 'toolUse': closeLive(); onToolUse(ev); break;
       case 'subText': onSubText({ id: ev.parent, subText: ev.text }); break;
       case 'toolResult': onToolResult(ev); break;
       case 'permission': closeLive(); addPermission(ev, null); break;
       case 'permitted': { const p = log.querySelector(`.perm[data-id="${ev.id}"]`); if (p) markPerm(p, ev.answer); break; }
       case 'note': note(ev.text, ev.err); break;
-      case 'done': closeLive(); onDone(ev); break;
+      case 'done': closeLive(); onDone(ev); window.Voice?.onDone(ev.ok); break;
     }
   }
   function closeLive() { if (V.live && !V.live.raw.trim()) V.live.el.remove(); V.live = null; if (V.think) { V.think.classList.remove('live'); V.think = null; } }
@@ -1095,7 +1097,7 @@
     // claude.ai layout: text on top; below it "+", the slot (Chat/Cowork, folder), then model, mic and the send button, which only shows once there is something to send.
     host.innerHTML = `<div class="box"><div class="chips"></div><div class="top"><textarea rows="1" placeholder="${tr('Write a message…')}"></textarea></div><div class="interim"></div>
       <div class="crow"><button class="icon attach" title="${tr('Add files, skills and more')}">${icon('plus')}</button><input type="file" multiple hidden><span class="slot"></span>
-      <span class="slot-r"><span class="spin" hidden title="${tr('Claude is working')}"></span><button class="icon mic" title="${tr('Dictate (click to start / stop)')}">${icon('mic')}</button><button class="send" title="${tr('Send (Enter)')}" hidden>${icon('up')}</button></span></div></div>`;
+      <span class="slot-r"><span class="spin" hidden title="${tr('Claude is working')}"></span><button class="icon vm" title="${tr('Voice mode')}">${icon('voice')}</button><button class="icon mic" title="${tr('Dictate (click to start / stop)')}">${icon('mic')}</button><button class="send" title="${tr('Send (Enter)')}" hidden>${icon('up')}</button></span></div></div>`;
     const ta = host.querySelector('textarea'), chips = host.querySelector('.chips'), fileIn = host.querySelector('input[type=file]');
     const sendBtn = host.querySelector('.send'), mic = host.querySelector('.mic'), interim = host.querySelector('.interim'), spin = host.querySelector('.spin');
     const attachments = []; let busy = false;
@@ -1133,6 +1135,7 @@
       richMenu(e, items);
     };
     fileIn.onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
+    host.querySelector('.vm').onclick = () => window.Voice?.open();
     host.addFilesDialog = () => fileIn.click();
     function submit() {
       if (attachments.some((a) => !a.path)) { toast(tr('Files are still uploading — one moment.')); return; }
@@ -1195,7 +1198,7 @@
       acts.append(now, x); d.append(b, acts); box.appendChild(d);
     }
   }
-  function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files }); }
+  function flushQueue(sid) { const q = queues.get(sid); if (!q?.length) return; const m = q.shift(); if (sid === S.sid) renderQueue(); send({ type: 'send', sid, text: m.text, files: m.files, voice: !!m.voice }); }
   // Inside the welcome composer: Chat/Cowork toggle and project folder on the left, the model picker on the right (like claude.ai).
   welcomeComposer.slot.append($('kindSeg'), $('projectChip'), $('modeChip')); welcomeComposer.slotR.prepend($('modelChip'));
   $('welcomeChips').remove();
@@ -1233,7 +1236,7 @@
   function speak(text, onEnd) {
     if (!window.speechSynthesis) { onEnd?.(); return; }
     const plain = text.replace(/```[\s\S]*?```/g, ' (code) ').replace(/[`*#>_]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(plain.slice(0, 4000)); u.lang = S.settings.lang || 'fr-FR';
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(plain.slice(0, 4000)); u.lang = S.settings.lang || 'fr-FR'; const vv = window.Voice?.pickVoice(u.lang); if (vv) u.voice = vv; u.rate = window.Voice?.rate() || 1;
     let done = false; const end = () => { if (!done) { done = true; onEnd?.(); } }; u.onend = end; u.onerror = end; speechSynthesis.speak(u);
   }
 
@@ -1288,7 +1291,8 @@
       const mine = S.sessions.filter((s) => s.cwd === p.path && !s.archived); const n = mine.length; const last = mine.reduce((m, s) => Math.max(m, s.when), 0);
       const r = el('div', 'card p'); r.innerHTML = `<b class="nm"></b><div class="path"></div><div class="foot"><span class="when"></span><span class="acts"></span></div>`;
       r.querySelector('.nm').textContent = p.name; r.querySelector('.path').textContent = shortPath(p.path); r.title = p.path;
-      r.querySelector('.when').textContent = (n === 1 ? tr('1 session') : tr('{n} sessions', { n })) + (last ? ' · ' + ago(last) : '');
+      const sids = new Set(mine.map((s) => s.sid)); const nArt = S.artifacts.reduce((k, a) => k + (sids.has(a.sid) ? 1 : 0), 0);
+      r.querySelector('.when').textContent = (n === 1 ? tr('1 session') : tr('{n} sessions', { n })) + (nArt ? ' · ' + (nArt === 1 ? tr('1 file') : tr('{n} files', { n: nArt })) : '') + (last ? ' · ' + ago(last) : '');
       const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
       const a = el('button', 'btn', tr('New session')); a.onclick = stop(() => { setTab(S.tab === 'cowork' ? 'cowork' : 'code'); showWelcome(p.path); });
       const b = el('button', 'btn', tr('Cowork task')); b.onclick = stop(() => { setTab('cowork'); showWelcome(p.path); });
@@ -1676,7 +1680,7 @@
   $('setMode').onchange = () => send({ type: 'settings', mode: $('setMode').value });
   $('setCoworkMode').onchange = () => send({ type: 'settings', coworkMode: $('setCoworkMode').value });
   $('setBrowser').onchange = () => send({ type: 'settings', browser: $('setBrowser').checked });
-  $('setLang').onchange = () => send({ type: 'settings', lang: $('setLang').value });
+  $('setLang').onchange = () => { send({ type: 'settings', lang: $('setLang').value }); setTimeout(() => window.Voice?.populateVoices(), 300); };
   // Interface language: remembered per browser like the theme; the page reloads so every string is rebuilt.
   $('setUiLang').onchange = () => { store.set('uiLang', $('setUiLang').value); location.reload(); };
   $('setSpeak').onchange = () => { store.set('speak', $('setSpeak').checked); if (!$('setSpeak').checked) speechSynthesis?.cancel(); };
@@ -1752,5 +1756,17 @@
   function shortPath(p) { if (!p) return ''; return S.home && p.startsWith(S.home) ? '~' + p.slice(S.home.length) : p; }
 
   // ---------------------------------------------------------------- start
+  // voice mode (public/voice.js): what it needs from the app
+  window.Voice?.init({
+    lang: () => S.settings.lang || LOCALE || 'fr-FR',
+    toast,
+    stop() { if (S.view === 'session' && S.sid) send({ type: 'stop', sid: S.sid }); },
+    send(text) {
+      if (S.view === 'session' && S.info) {
+        if (S.info.status !== 'idle') { const q = queues.get(S.sid) || []; q.push({ text, files: [], voice: true }); queues.set(S.sid, q); renderQueue(); send({ type: 'stop', sid: S.sid }); }
+        else send({ type: 'send', sid: S.sid, text, files: [], voice: true });
+      } else { pendingFirst = { text, files: [], voice: true }; send({ type: 'new', kind: 'chat', cwd: '' }); }
+    },
+  });
   resetView(); setTab(S.tab); showWelcome(); connect();
 })();
