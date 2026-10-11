@@ -1450,6 +1450,14 @@
     } else { box.innerHTML = icon(ext === 'pdf' ? 'file' : 'file'); box.classList.add('ico'); box.appendChild(el('span', null, ext ? '.' + ext : '')); }
     return box;
   }
+  // "View": the file itself in a new tab — rendered when the browser can show it (HTML, SVG, images, PDF, text), as plain text otherwise
+  const RENDERABLE = /\.(html?|svg|png|jpe?g|gif|webp|pdf|mp4|webm|json|css|txt|md|csv)$/i;
+  function viewLink(a, cls, label) {
+    const v = el('a', cls, label); if (!label) v.innerHTML = icon('expand');
+    v.href = fileUrl(a.path, !RENDERABLE.test(a.path)); v.target = '_blank'; v.rel = 'noopener'; v.title = tr('Open in new tab');
+    v.onclick = (e) => e.stopPropagation();
+    return v;
+  }
   function renderArtifacts() {
     document.querySelectorAll('#artView button').forEach((b) => b.classList.toggle('active', b.dataset.v === artView));
     const box = $('artifactList'); box.innerHTML = ''; box.classList.toggle('grid', artView === 'grid');
@@ -1471,7 +1479,7 @@
           const t = el('div', 'at'); t.innerHTML = `${icon('file')}<span class="nm"></span><span class="acts"></span>`;
           t.querySelector('.nm').textContent = base(a.path);
           const f = el('button', 'ib sm'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = (e) => { e.stopPropagation(); send({ type: 'reveal', path: a.path }); };
-          t.querySelector('.acts').appendChild(f);
+          t.querySelector('.acts').append(viewLink(a, 'ib sm'), f);
           const m = el('div', 'am', `${tr(a.action)} · ${ago(s.when)}`);
           c.append(t, m); c.onclick = () => openArtifact(a); g.appendChild(c);
         }
@@ -1480,10 +1488,11 @@
       for (const a of files) {
         const r = el('div', 'prow click'); r.innerHTML = `<span class="icon">${icon('file')}</span><span class="t"><b></b><small></small></span>`;
         r.querySelector('b').textContent = base(a.path); r.querySelector('small').textContent = `${tr(a.action)} · ${shortPath(a.path)}`;
-        r.onclick = (e) => { if (!e.target.closest('button')) openArtifact(a); };
-        const o = el('button', 'btn', tr('Open')); o.onclick = () => openArtifact(a);
+        r.onclick = (e) => { if (!e.target.closest('button, a')) openArtifact(a); };
+        const v = viewLink(a, 'btn', tr('View'));
+        const o = el('button', 'btn', tr('Open chat')); o.title = tr('Open the conversation that made it'); o.onclick = () => openArtifact(a);
         const f = el('button', 'ib'); f.innerHTML = icon('folder'); f.title = tr('Show in folder'); f.onclick = () => send({ type: 'reveal', path: a.path });
-        r.append(o, f); box.appendChild(r);
+        r.append(v, o, f); box.appendChild(r);
       }
     }
   }

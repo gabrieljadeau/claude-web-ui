@@ -143,13 +143,13 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent); }
 .welcome h1 { font-family: var(--serif); font-weight: 400; font-size: 38px; margin: 0 0 24px; letter-spacing: -.3px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .welcome h1 .star { width: 32px; height: 32px; } .welcome h1 .logo { width: 36px; height: 36px; stroke: none; }
 .welcome .composer-box { width: min(600px, 100%); margin: 0 auto; }
-/* Code space: small title top-left, composer docked at the bottom, like claude.ai/code */
-body.space-code .welcome { margin: 0; width: 100%; max-width: none; height: 100%; display: flex; flex-direction: column; padding: 18px 24px 4px; }
-body.space-code .welcome h1 { justify-content: flex-start; font-family: inherit; font-size: 17px; font-weight: 500; gap: 8px; margin: 0; letter-spacing: 0; }
-body.space-code .welcome h1 .logo { width: 20px; height: 20px; }
-body.space-code .welcome .composer-box { margin: auto auto 0; width: min(var(--wrap), 100%); }
-body.space-code .welcome .suggest, body.space-code .howto { display: none; }   /* the Code tab keeps the composer at the bottom: no card, a Map button in the title row instead */
-.map-chip { display: none; margin-left: auto; font-size: 12.5px; padding: 4px 10px; } body.space-code .map-chip { display: inline-flex; }
+/* Code space: like the desktop app's new session, greeting and composer centered in the empty area; the Map button sits in the top-right corner */
+body.space-code .welcome { position: relative; margin: 0; width: 100%; max-width: none; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 24px 24px 15vh; }
+body.space-code .welcome h1 { justify-content: center; font-family: inherit; font-size: 26px; font-weight: 500; gap: 10px; margin: 0 0 22px; letter-spacing: -.2px; }
+body.space-code .welcome h1 .logo { width: 26px; height: 26px; }
+body.space-code .welcome .composer-box { margin: 0 auto; width: min(720px, 100%); }
+body.space-code .welcome .suggest, body.space-code .howto { display: none; }   /* the Code tab shows no card: the Map button opens the same dialog */
+.map-chip { display: none; font-size: 12.5px; padding: 4px 10px; } body.space-code .map-chip { display: inline-flex; position: absolute; top: 14px; right: 18px; }
 .suggest { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
 .howto { width: min(680px, 100%); margin: 36px auto 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 16px 18px 10px; }
 .howto[hidden] { display: none; }
@@ -633,3 +633,6 @@ dialog.report { width: min(600px, 92vw); border-radius: 18px; }
 .row .cb { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; color: transparent; background: var(--bg, transparent); }
 .row .cb svg { width: 11px; height: 11px; stroke-width: 3; } .row .cb.on { background: var(--ink); border-color: var(--ink); color: var(--bg, #fff); }
 .row.selectable { min-height: 30px; } .row.sel { background: var(--hover); } .row.selectable .t small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* artifacts: "View" opens the file itself in a new tab */
+a.btn, a.ib { text-decoration: none; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+a.ib { color: var(--muted); } a.ib:hover { color: var(--ink); }
